@@ -95,6 +95,7 @@ class CandidateRegistration(BaseModel):
 
 class ExamConfiguration(BaseModel):
     title: str = Field(min_length=1, max_length=160)
+    problem_statement: str = Field(default="", max_length=12000)
     duration_minutes: int = Field(ge=1, le=600)
     status: str = Field(default="OPEN", pattern="^(OPEN|PAUSED|CLOSED)$")
     starts_at: str | None = Field(default=None, max_length=40)
@@ -166,11 +167,15 @@ def setup_database() -> None:
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        exam_columns = {row["name"] for row in conn.execute("PRAGMA table_info(exam_config)")}
+        if "problem_statement" not in exam_columns:
+            conn.execute("ALTER TABLE exam_config ADD COLUMN problem_statement TEXT NOT NULL DEFAULT ''")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_name ON candidates(student_name)")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS exam_config (
                 id INTEGER PRIMARY KEY CHECK (id = 1),
                 title TEXT NOT NULL,
+                problem_statement TEXT NOT NULL DEFAULT '',
                 duration_minutes INTEGER NOT NULL,
                 status TEXT NOT NULL DEFAULT 'OPEN',
                 starts_at TEXT,
@@ -374,7 +379,7 @@ async def authenticate(payload: AuthRequest, request: Request):
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
     with db_connection() as conn:
-        config = conn.execute("SELECT status, starts_at, ends_at, title, duration_minutes FROM exam_config WHERE id=1").fetchone()
+        config = conn.execute("SELECT status, starts_at, ends_at, title, problem_statement, duration_minutes FROM exam_config WHERE id=1").fetchone()
         if config:
             if config["status"] != "OPEN":
                 raise HTTPException(status_code=403, detail="The examination is not currently accepting candidates.")
@@ -504,7 +509,7 @@ async def faculty_get_exam(request: Request):
     with db_connection() as conn:
         row = conn.execute("SELECT * FROM exam_config WHERE id=1").fetchone()
         return dict(row) if row else {
-            "id": 1, "title": "LabLock Examination", "duration_minutes": 60,
+            "id": 1, "title": "LabLock Examination", "problem_statement": "", "duration_minutes": 60,
             "status": "OPEN", "starts_at": None, "ends_at": None, "updated_at": None,
         }
 
@@ -514,14 +519,14 @@ async def faculty_set_exam(payload: ExamConfiguration, request: Request):
     require_faculty(request)
     with db_connection() as conn:
         conn.execute("""
-            INSERT INTO exam_config (id, title, duration_minutes, status, starts_at, ends_at, updated_at)
-            VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            INSERT INTO exam_config (id, title, problem_statement, duration_minutes, status, starts_at, ends_at, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(id) DO UPDATE SET title=excluded.title,
-                duration_minutes=excluded.duration_minutes, status=excluded.status,
+                problem_statement=excluded.problem_statement, duration_minutes=excluded.duration_minutes,
                 starts_at=excluded.starts_at, ends_at=excluded.ends_at,
                 updated_at=CURRENT_TIMESTAMP
-        """, (payload.title.strip(), payload.duration_minutes, payload.status,
-              payload.starts_at, payload.ends_at))
+        """, (payload.title.strip(), payload.problem_statement.strip(), payload.duration_minutes,
+              payload.status, payload.starts_at, payload.ends_at))
         conn.commit()
         return dict(conn.execute("SELECT * FROM exam_config WHERE id=1").fetchone())
 
