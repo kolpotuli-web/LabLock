@@ -82,6 +82,14 @@ def test_faculty_exam_roster_and_attempt_management(tmp_path, monkeypatch):
         assert client.get("/faculty/sessions").status_code == 401
 
         assert client.post("/faculty/unlock", json={"pin": "test-faculty-pin"}).status_code == 200
+        invalid_schedule = client.put("/faculty/exam", json={
+            "title": "Invalid schedule",
+            "duration_minutes": 60,
+            "status": "OPEN",
+            "starts_at": "2026-11-05T12:00:00+00:00",
+            "ends_at": "2026-11-05T11:00:00+00:00",
+        })
+        assert invalid_schedule.status_code == 422
 
         config = client.get("/faculty/exam")
         assert config.status_code == 200
