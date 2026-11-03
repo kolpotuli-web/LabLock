@@ -178,7 +178,7 @@ function initStudentTerminal() {
             }
 
             state.studentName = nameInput;
-            state.terminalId = terminalInput;
+            state.terminalId = terminalInput.toUpperCase();
             state.authenticated = true;
             state.sessionStartTime = new Date();
 
@@ -544,103 +544,6 @@ function runEvaluationSuite(userCode) {
     consoleBody.append(notice, detail);
 }
 
-function transpilePythonToJsClass(pyCode) {
-    const lines = pyCode.split('\n');
-    let jsCode = '';
-    let indentStack = [0];
-
-    for (let i = 0; i < lines.length; i++) {
-        let line = lines[i];
-        if (line.trim().length === 0 || line.trim().startsWith('#')) continue;
-
-        // Strip Python type annotations
-        line = line.replace(/:\s*(?:int|str|float|bool|Node|None|Any)\b/g, '');
-        line = line.replace(/\s*->\s*(?:int|str|float|bool|Node|None|Any)\s*:/g, ':');
-
-        const indentMatch = line.match(/^(\s*)/);
-        const indent = indentMatch ? indentMatch[1].length : 0;
-        const trimmed = line.trim();
-
-        while (indentStack.length > 1 && indent < indentStack[indentStack.length - 1]) {
-            indentStack.pop();
-            jsCode += '}\n';
-        }
-
-        let jsLine = trimmed;
-
-        // class Definition
-        if (/^class\s+([A-Za-z0-9_]+)\s*:/.test(jsLine)) {
-            const className = jsLine.match(/^class\s+([A-Za-z0-9_]+)/)[1];
-            jsCode += 'class ' + className + ' {\n';
-            indentStack.push(indent + 4);
-            continue;
-        }
-
-        // def __init__(self, ...)
-        if (/^def\s+__init__\s*\(\s*self\s*,?\s*(.*?)\)\s*:/.test(jsLine)) {
-            const args = jsLine.match(/^def\s+__init__\s*\(\s*self\s*,?\s*(.*?)\)\s*:/)[1];
-            jsCode += 'constructor(' + args + ') {\n';
-            indentStack.push(indent + 4);
-            continue;
-        }
-
-        // def method(self, ...)
-        if (/^def\s+([A-Za-z0-9_]+)\s*\(\s*self\s*,?\s*(.*?)\)\s*:/.test(jsLine)) {
-            const m = jsLine.match(/^def\s+([A-Za-z0-9_]+)\s*\(\s*self\s*,?\s*(.*?)\)\s*:/);
-            jsCode += m[1] + '(' + m[2] + ') {\n';
-            indentStack.push(indent + 4);
-            continue;
-        }
-
-        // Conversions
-        jsLine = jsLine.replace(/\bself\b/g, 'this');
-        jsLine = jsLine.replace(/\bNone\b/g, 'null');
-        jsLine = jsLine.replace(/\bTrue\b/g, 'true');
-        jsLine = jsLine.replace(/\bFalse\b/g, 'false');
-        jsLine = jsLine.replace(/\bdel\s+(.*?)$/g, 'delete $1;');
-        jsLine = jsLine.replace(/\blen\((.*?)\)/g, '((typeof $1 === "object" && !Array.isArray($1)) ? Object.keys($1).length : ($1).length)');
-        jsLine = jsLine.replace(/\bNode\(/g, 'new Node(');
-
-        // if / elif / else
-        if (jsLine.startsWith('if ') && jsLine.endsWith(':')) {
-            let cond = jsLine.substring(3, jsLine.length - 1).trim();
-            cond = cond.replace(/\b(.*?)\s+in\s+(.*?)$/, '($1 in $2)');
-            cond = cond.replace(/\b(.*?)\s+not in\s+(.*?)$/, '(!($1 in $2))');
-            jsCode += 'if (' + cond + ') {\n';
-            indentStack.push(indent + 4);
-            continue;
-        }
-        if (jsLine.startsWith('elif ') && jsLine.endsWith(':')) {
-            let cond = jsLine.substring(5, jsLine.length - 1).trim();
-            cond = cond.replace(/\b(.*?)\s+in\s+(.*?)$/, '($1 in $2)');
-            cond = cond.replace(/\b(.*?)\s+not in\s+(.*?)$/, '(!($1 in $2))');
-            jsCode += 'else if (' + cond + ') {\n';
-            indentStack.push(indent + 4);
-            continue;
-        }
-        if (jsLine === 'else:') {
-            jsCode += 'else {\n';
-            indentStack.push(indent + 4);
-            continue;
-        }
-
-        // Local variable assignment scoping
-        if (/^([a-zA-Z_][a-zA-Z0-9_]*)\s*=/.test(jsLine)) {
-            const varName = jsLine.match(/^([a-zA-Z_][a-zA-Z0-9_]*)/)[1];
-            if (!['this', 'return'].includes(varName)) {
-                jsLine = 'var ' + jsLine;
-            }
-        }
-
-        jsCode += jsLine + ';\n';
-    }
-
-    while (indentStack.length > 1) {
-        indentStack.pop();
-        jsCode += '}\n';
-    }
-    return jsCode;
-}
 
 function appendConsoleOutput(msg, cssClass) {
     const consoleBody = document.getElementById('consoleBody');
@@ -683,6 +586,7 @@ async function fetchAuditLogs() {
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
         state.logs = Array.isArray(data.logs) ? data.logs : [];
+        state.totalIncidents = Number(data.total_incidents ?? state.logs.length);
         updateDashboardCounters(data.active_terminals);
         renderFilteredLogs(false);
     } catch (err) {
@@ -697,12 +601,12 @@ function updateDashboardCounters(serverActiveCount) {
     const phoneElem = document.getElementById('metricPhoneViolations');
     const blurElem = document.getElementById('metricBlurViolations');
 
-    if (totalElem) totalElem.textContent = String(state.logs.length);
+    if (totalElem) totalElem.textContent = String(typeof state.totalIncidents === 'number' ? state.totalIncidents : state.logs.length);
 
     const uniqueStudents = new Set(state.logs.map(l => l.student_name).filter(Boolean));
     const activeCount = typeof serverActiveCount === 'number'
-        ? Math.max(serverActiveCount, uniqueStudents.size)
-        : uniqueStudents.size;
+        ? serverActiveCount
+        : 0;
     if (terminalsElem) terminalsElem.textContent = String(activeCount);
 
     const phones = state.logs.filter(l => (l.violation_type || '').toLowerCase().includes('phone')).length;
