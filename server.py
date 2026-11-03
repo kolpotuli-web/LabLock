@@ -206,6 +206,19 @@ def setup_database() -> None:
         exam_columns = {row["name"] for row in conn.execute("PRAGMA table_info(exam_config)")}
         if "problem_statement" not in exam_columns:
             conn.execute("ALTER TABLE exam_config ADD COLUMN problem_statement TEXT NOT NULL DEFAULT ''")
+        conn.execute("""
+            UPDATE sessions SET status='ENDED', ended_at=CURRENT_TIMESTAMP,
+                completion_reason='Superseded duplicate active terminal session'
+            WHERE status='ACTIVE' AND id != (
+                SELECT newer.id FROM sessions AS newer
+                WHERE newer.terminal_id=sessions.terminal_id AND newer.status='ACTIVE'
+                ORDER BY newer.started_at DESC, newer.rowid DESC LIMIT 1
+            )
+        """)
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_one_active_terminal
+            ON sessions(terminal_id) WHERE status='ACTIVE'
+        """)
         conn.commit()
 
 
@@ -443,10 +456,13 @@ async def authenticate(payload: AuthRequest, request: Request):
             raise HTTPException(status_code=409, detail="This terminal already has an active examination session.")
         duration_minutes = int(config["duration_minutes"]) if config else 60
         exam_title = config["title"] if config else "LabLock Examination"
-        conn.execute(
-            "INSERT INTO sessions (id, student_name, terminal_id, duration_minutes) VALUES (?, ?, ?, ?)",
-            (session_id, student_name, terminal_id, duration_minutes),
-        )
+        try:
+            conn.execute(
+                "INSERT INTO sessions (id, student_name, terminal_id, duration_minutes) VALUES (?, ?, ?, ?)",
+                (session_id, student_name, terminal_id, duration_minutes),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=409, detail="This terminal already has an active examination session.") from exc
         conn.commit()
     return {
         "status": "OK", "session_id": session_id, "student_name": student_name,
