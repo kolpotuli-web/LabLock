@@ -42,7 +42,17 @@
         </div>
     </header>
 
-    <main class="dashboard-container" id="facultyDashboard">
+    <section id="facultyAuthGate" style="max-width:440px;margin:12vh auto;padding:28px;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 30px #0f172a12;">
+        <h1 style="font-size:22px;font-weight:800;margin-bottom:8px;">Faculty authorization</h1>
+        <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your faculty key to access the examination audit records.</p>
+        <form id="facultyAuthForm">
+            <label for="facultyDashboardPin" style="display:block;font-size:12px;font-weight:700;margin-bottom:7px;">FACULTY KEY</label>
+            <input id="facultyDashboardPin" type="password" autocomplete="current-password" required style="width:100%;height:44px;border:1px solid #cbd5e1;border-radius:6px;padding:0 12px;margin-bottom:12px;">
+            <p id="facultyAuthError" style="display:none;color:#b91c1c;font-size:12px;margin-bottom:12px;"></p>
+            <button type="submit" class="btn btn-primary" style="width:100%;">Unlock audit console</button>
+        </form>
+    </section>
+    <main class="dashboard-container" id="facultyDashboard" style="display:none;">
         <div class="dashboard-header-row">
             <div class="dashboard-title-area">
                 <h1>Laboratory Invigilation &amp; Audit Overview</h1>
