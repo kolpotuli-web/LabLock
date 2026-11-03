@@ -42,6 +42,10 @@ const state = {
     sessionStartTime: null,
     sessionId: null,
     sessionHeartbeatTimer: null,
+    examTimer: null,
+    examDeadline: null,
+    examTitle: 'LabLock Examination',
+    examDurationMinutes: 60,
     reconnectTimer: null,
     totalViolations: 0,
     lastTableHtml: ''
@@ -171,6 +175,8 @@ function initStudentTerminal() {
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.detail || 'Candidate authentication failed.');
                 state.sessionId = result.session_id;
+                state.examTitle = result.exam_title || 'LabLock Examination';
+                state.examDurationMinutes = Number(result.duration_minutes) || 60;
             } catch (authErr) {
                 showAuthError(authErr.message || 'Unable to authenticate with the examination server.');
                 if (authSubmit) authSubmit.disabled = false;
@@ -189,6 +195,11 @@ function initStudentTerminal() {
             const dispTerminal = document.getElementById('displayTerminalId');
             if (dispStudent) dispStudent.textContent = state.studentName;
             if (dispTerminal) dispTerminal.textContent = state.terminalId;
+            const examTitleDisplay = document.getElementById('examTitleDisplay');
+            const examDurationDisplay = document.getElementById('examDurationDisplay');
+            if (examTitleDisplay) examTitleDisplay.textContent = state.examTitle;
+            if (examDurationDisplay) examDurationDisplay.textContent = 'Attempt duration: ' + state.examDurationMinutes + ' minutes';
+            startAttemptCountdown();
 
             const cameraReady = await startWebcamProctoring();
             if (!cameraReady) {
@@ -277,6 +288,7 @@ function endCandidateSession() {
     if (state.sampleTimer) clearInterval(state.sampleTimer);
     if (state.pollTimer) clearInterval(state.pollTimer);
     if (state.sessionHeartbeatTimer) clearInterval(state.sessionHeartbeatTimer);
+    if (state.examTimer) clearInterval(state.examTimer);
     if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
     state.authenticated = false;
     if (state.ws && state.ws.readyState <= WebSocket.OPEN) state.ws.close(1000, 'Candidate session ended');
@@ -287,6 +299,26 @@ function endCandidateSession() {
         navigator.sendBeacon(CONFIG.API_BASE + '/session/end', payload);
     }
     state.sessionId = null;
+}
+
+function startAttemptCountdown() {
+    if (state.examTimer) clearInterval(state.examTimer);
+    state.examDeadline = Date.now() + state.examDurationMinutes * 60 * 1000;
+    const display = document.getElementById('workspaceTimer');
+    const update = () => {
+        const remaining = Math.max(0, state.examDeadline - Date.now());
+        const totalSeconds = Math.ceil(remaining / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        if (display) display.textContent = 'Time remaining: ' + String(minutes).padStart(2, '0') + ':' + String(seconds).padStart(2, '0');
+        if (remaining <= 0 && state.examTimer) {
+            clearInterval(state.examTimer);
+            state.examTimer = null;
+            if (display) display.textContent = 'Time expired · awaiting server confirmation';
+        }
+    };
+    update();
+    state.examTimer = setInterval(update, 1000);
 }
 
 function showAuthError(msg) {
