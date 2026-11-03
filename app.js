@@ -190,7 +190,15 @@ function initStudentTerminal() {
             if (dispStudent) dispStudent.textContent = state.studentName;
             if (dispTerminal) dispTerminal.textContent = state.terminalId;
 
-            await startWebcamProctoring();
+            const cameraReady = await startWebcamProctoring();
+            if (!cameraReady) {
+                endCandidateSession();
+                if (workspace) workspace.classList.remove('active');
+                if (authGate) authGate.style.display = 'block';
+                showAuthError('Camera access is required to begin a proctored examination. Allow camera access and sign in again.');
+                if (authSubmit) authSubmit.disabled = false;
+                return;
+            }
             initCodeEditor();
             setupSecurityListeners();
             if (state.sessionHeartbeatTimer) clearInterval(state.sessionHeartbeatTimer);
@@ -317,12 +325,12 @@ async function startWebcamProctoring() {
         appendConsoleOutput('[HARDWARE]: MediaDevices camera stream initialized.');
     } catch (err) {
         appendConsoleOutput('[HARDWARE ERROR]: Camera access failed (' + err.message + ').', 'alert-text');
-        triggerLockoutModal('Hardware Policy Violation (Camera Unreachable)');
-        dispatchBlurViolation('Hardware Policy Violation (Camera Unreachable)');
-        return;
+        appendConsoleOutput('[SECURITY]: Examination was not started because camera access is required.', 'alert-text');
+        return false;
     }
 
     connectProctorWebSocket(video, canvas, statusIndicator, statusText);
+    return true;
 }
 
 function connectProctorWebSocket(video, canvas, statusIndicator, statusText) {
