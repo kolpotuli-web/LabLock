@@ -167,9 +167,6 @@ def setup_database() -> None:
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        exam_columns = {row["name"] for row in conn.execute("PRAGMA table_info(exam_config)")}
-        if "problem_statement" not in exam_columns:
-            conn.execute("ALTER TABLE exam_config ADD COLUMN problem_statement TEXT NOT NULL DEFAULT ''")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_name ON candidates(student_name)")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS exam_config (
@@ -183,6 +180,9 @@ def setup_database() -> None:
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        exam_columns = {row["name"] for row in conn.execute("PRAGMA table_info(exam_config)")}
+        if "problem_statement" not in exam_columns:
+            conn.execute("ALTER TABLE exam_config ADD COLUMN problem_statement TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
