@@ -41,6 +41,7 @@ MIN_INFERENCE_INTERVAL = 0.35
 COOLDOWN_WINDOW_SECONDS = 8
 
 _ai_executor = ThreadPoolExecutor(max_workers=MAX_AI_WORKERS, thread_name_prefix="lablock-ai")
+_ai_semaphore = asyncio.Semaphore(MAX_AI_WORKERS)
 _ai_local = threading.local()
 _db_write_lock = threading.Lock()
 _cooldown_lock = threading.Lock()
@@ -471,12 +472,19 @@ async def proctor_endpoint(websocket: WebSocket, student_name: str):
             last_inference = now
             loop = asyncio.get_running_loop()
             try:
+                await asyncio.wait_for(_ai_semaphore.acquire(), timeout=1.0)
+            except asyncio.TimeoutError:
+                await websocket.send_json({"status": "SKIPPED", "reason": "ai_workers_busy"})
+                continue
+            try:
                 alerts = await loop.run_in_executor(_ai_executor, run_ai_proctoring, image)
             except Exception as exc:
                 global _model_load_error
                 _model_load_error = str(exc)
                 await websocket.send_json({"status": "ERROR", "message": "AI inference temporarily unavailable"})
                 continue
+            finally:
+                _ai_semaphore.release()
             detected = set(alerts)
             confirmed_alerts = []
             for message, threshold in alert_thresholds.items():
