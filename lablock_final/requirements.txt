@@ -1,7 +1,0 @@
-fastapi
-uvicorn
-ultralytics
-mediapipe
-opencv-python
-numpy
-pydantic
