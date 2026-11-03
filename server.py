@@ -446,6 +446,12 @@ async def faculty_unlock(payload: FacultyAuthRequest, request: Request, response
     return {"status": "OK"}
 
 
+@app.post("/faculty/logout")
+async def faculty_logout(response: Response):
+    response.delete_cookie("lablock_faculty", path="/", httponly=True, samesite="lax")
+    return {"status": "OK"}
+
+
 @app.post("/log-violation")
 async def log_violation_endpoint(payload: ViolationRequest):
     def session_is_active():
