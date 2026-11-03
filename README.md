@@ -35,12 +35,15 @@ python -m uvicorn server:app --host 0.0.0.0 --port 8000
 
 - Candidate authentication is checked by the backend; no PIN is accepted based only on client-side length checks.
 - Faculty lockout release is also verified by the backend.
+- Candidate sign-in is throttled per terminal and faculty sign-in per client IP; PIN comparisons use constant-time HMAC comparison.
+- Candidate sessions expire on the server when their configured duration elapses or their heartbeat is missing for more than 45 seconds. The WebSocket stops processing frames for finalized/expired attempts.
 - Each inference worker owns its own YOLO and MediaPipe instances. This avoids unsafe concurrent access to shared model objects and removes the single global AI mutex bottleneck.
 - AI work runs in a bounded thread pool. Set `LABLOCK_AI_WORKERS` to tune parallel model instances; increasing it increases RAM/VRAM usage.
 - SQLite uses WAL, a busy timeout, indexed audit/session tables and short-lived connections.
 - WebSocket frames are validated, size-limited, downscaled when needed and rate-limited. Active sockets must reference a valid candidate session.
 - Browser WebSocket backpressure is checked before sending another frame; reconnect attempts are limited to one pending timer.
-- The browser does not execute candidate code using `new Function`. A real isolated execution sandbox is required before enabling Run Evaluation.
+- Camera permission and a live camera stream are required before a candidate attempt can begin. A camera stream ending during an attempt stops that session.
+- The code editor is a local draft only. The evaluation control is disabled; the browser does not execute candidate code using `new Function`. A real isolated execution sandbox is required before enabling evaluation.
 
 ## AI model and privacy
 
