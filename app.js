@@ -534,7 +534,7 @@ function initCodeEditor() {
 function runEvaluationSuite(userCode) {
     const consoleBody = document.getElementById('consoleBody');
     if (!consoleBody) return;
-    const lineCount = String(userCode || '').split('\\n').length;
+    const lineCount = String(userCode || '').split('\n').length;
     consoleBody.textContent = '';
     const notice = document.createElement('div');
     notice.className = 'alert-text';
