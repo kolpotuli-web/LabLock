@@ -89,6 +89,7 @@ def test_faculty_exam_roster_and_attempt_management(tmp_path, monkeypatch):
 
         saved = client.put("/faculty/exam", json={
             "title": "DSA Practical",
+            "problem_statement": "Implement and test a linked list.",
             "duration_minutes": 90,
             "status": "OPEN",
             "starts_at": None,
@@ -126,6 +127,7 @@ def test_faculty_exam_roster_and_attempt_management(tmp_path, monkeypatch):
         assert auth.status_code == 200
         session_id = auth.json()["session_id"]
         assert auth.json()["exam_title"] == "DSA Practical"
+        assert auth.json()["problem_statement"] == "Implement and test a linked list."
         assert auth.json()["duration_minutes"] == 90
 
         sessions = client.get("/faculty/sessions")
