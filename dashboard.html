@@ -3,133 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LabLock - Faculty Invigilation Console</title>
+    <title>LabLock - Faculty Invigilation Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-
-    <!-- Top Navigation Bar -->
+<body class="faculty-page">
     <header class="top-navbar">
-        <div class="brand-section">
-            <div class="brand-logo-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="3" width="7" height="7"></rect>
-                    <rect x="14" y="14" width="7" height="7"></rect>
-                    <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
-            </div>
-            <span class="brand-name">LabLock</span>
-            <span class="brand-badge">Faculty Invigilation Console</span>
-        </div>
-
-        <div class="nav-actions">
-            <div class="meta-pill">
-                <span class="pulse-indicator"></span>
-                <span class="label">Live Polling:</span>
-                <span class="value">2000ms</span>
-            </div>
-            <a href="index.html" class="btn btn-secondary btn-sm">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-                Student Terminal
-            </a>
-        </div>
+        <a class="brand-section" href="index.html" aria-label="LabLock home">
+            <span class="brand-logo-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+            <span class="brand-copy"><span class="brand-name">LabLock Examination System</span><span class="brand-badge">Online Proctored Examinations</span></span>
+        </a>
+        <nav class="nav-actions" aria-label="Main navigation">
+            <a href="index.html" class="nav-tab"><span aria-hidden="true">▣</span> Examination Hall</a>
+            <a href="dashboard.html" class="nav-tab active"><span aria-hidden="true">♙</span> Faculty Console</a>
+            <span class="system-status"><span class="pulse-indicator"></span> System Online</span>
+        </nav>
     </header>
 
-    <section id="facultyAuthGate" style="max-width:440px;margin:12vh auto;padding:28px;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 30px #0f172a12;">
-        <h1 style="font-size:22px;font-weight:800;margin-bottom:8px;">Faculty authorization</h1>
-        <p style="font-size:13px;color:#64748b;margin-bottom:20px;">Enter your faculty key to access the examination audit records.</p>
+    <section id="facultyAuthGate" class="faculty-auth-card">
+        <div class="eyebrow">Faculty Console</div>
+        <h1>Invigilation Dashboard</h1>
+        <p>Sign in with your faculty key to review live terminal telemetry and examination records.</p>
         <form id="facultyAuthForm">
-            <label for="facultyDashboardPin" style="display:block;font-size:12px;font-weight:700;margin-bottom:7px;">FACULTY KEY</label>
-            <input id="facultyDashboardPin" type="password" autocomplete="current-password" required style="width:100%;height:44px;border:1px solid #cbd5e1;border-radius:6px;padding:0 12px;margin-bottom:12px;">
-            <p id="facultyAuthError" style="display:none;color:#b91c1c;font-size:12px;margin-bottom:12px;"></p>
-            <button type="submit" class="btn btn-primary" style="width:100%;">Unlock audit console</button>
+            <label for="facultyDashboardPin">Faculty authorization key</label>
+            <input id="facultyDashboardPin" type="password" autocomplete="current-password" required placeholder="Enter faculty key">
+            <p id="facultyAuthError" class="auth-error" style="display:none;"></p>
+            <button type="submit" class="btn btn-primary">Unlock faculty console</button>
         </form>
     </section>
+
     <main class="dashboard-container" id="facultyDashboard" style="display:none;">
-        <div class="dashboard-header-row">
-            <div class="dashboard-title-area">
-                <h1>Laboratory Invigilation &amp; Audit Overview</h1>
-                <p>Real-time terminal telemetry, incident logging, and candidate verification audit trail.</p>
-            </div>
+        <div class="dashboard-intro">
             <div>
-                <button type="button" class="btn btn-secondary btn-sm" id="manualRefreshBtn">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="23 4 23 10 17 10"></polyline>
-                        <polyline points="1 20 1 14 7 14"></polyline>
-                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                    </svg>
-                    Refresh Audit Feed
-                </button>
+                <div class="eyebrow">Faculty Console</div>
+                <h1>Invigilation Dashboard</h1>
+                <p>Live terminal telemetry, the incident ledger and photographic evidence review.</p>
+            </div>
+            <div class="dashboard-actions">
+                <span class="live-pill" id="dashboardConnection"><span class="pulse-indicator"></span> Live · auto refresh 2s</span>
+                <span class="updated-pill">Updated <time id="dashboardUpdated">--:--:--</time></span>
+                <button type="button" class="btn btn-danger-outline" id="resetDashboardBtn" title="Clear search and filters">↺ Reset</button>
+                <button type="button" class="btn btn-primary" id="manualRefreshBtn">⟳ Refresh</button>
             </div>
         </div>
 
-        <!-- Telemetry & Metric Highlights -->
-        <div class="metrics-grid">
-            <div class="metric-card">
-                <div class="metric-label">Active Terminals</div>
-                <div class="metric-value" id="metricActiveTerminals">0</div>
-                <div class="metric-sub">Synchronized with proctoring engine</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Total Logged Incidents</div>
-                <div class="metric-value alert" id="metricTotalIncidents">0</div>
-                <div class="metric-sub">SQLite database records</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Mobile Phone Detections</div>
-                <div class="metric-value alert" id="metricPhoneViolations">0</div>
-                <div class="metric-sub">YOLOv8 visual classifier</div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Terminal Blur / Tab Switches</div>
-                <div class="metric-value" id="metricBlurViolations" style="color:var(--warning-ink);">0</div>
-                <div class="metric-sub">Focus guard lockouts</div>
-            </div>
+        <div class="dashboard-tabs" role="tablist" aria-label="Faculty dashboard sections">
+            <button class="dashboard-tab active" type="button" data-dashboard-tab="monitoring" role="tab" aria-selected="true">⌁ Live Monitoring</button>
+            <button class="dashboard-tab" type="button" data-dashboard-tab="setup" role="tab" aria-selected="false">▤ Examination Setup</button>
         </div>
 
-        <!-- Real-Time Audit Log Table -->
-        <div class="table-card">
-            <div class="table-toolbar">
-                <div class="table-toolbar-left">
-                    <input type="text" id="searchInput" class="search-input" placeholder="Filter by candidate, ID, or violation...">
-                    <select id="violationFilter" class="lang-select">
-                        <option value="ALL">All Violation Categories</option>
-                        <option value="PHONE">Mobile Phone Detected</option>
-                        <option value="BLUR">Terminal Blur / Tab Switch</option>
-                        <option value="GAZE">Looking Off-Screen</option>
-                    </select>
+        <section id="monitoringPanel" class="dashboard-panel">
+            <div class="metrics-grid">
+                <article class="metric-card"><div class="metric-top"><div class="metric-label">Active Terminals</div><span class="metric-icon">▣</span></div><div class="metric-value" id="metricActiveTerminals">0</div><div class="metric-sub">Heartbeat within the last 45s</div></article>
+                <article class="metric-card"><div class="metric-top"><div class="metric-label">Total Incidents</div><span class="metric-icon danger">♢</span></div><div class="metric-value" id="metricTotalIncidents">0</div><div class="metric-sub">All categories, all sessions</div></article>
+                <article class="metric-card"><div class="metric-top"><div class="metric-label">Phone Detections</div><span class="metric-icon warning">▯</span></div><div class="metric-value" id="metricPhoneViolations">0</div><div class="metric-sub">Vision model detections</div></article>
+                <article class="metric-card"><div class="metric-top"><div class="metric-label">Focus Lockouts</div><span class="metric-icon amber">▤</span></div><div class="metric-value" id="metricBlurViolations">0</div><div class="metric-sub">Window blur / tab switches</div></article>
+            </div>
+
+            <div class="analytics-grid">
+                <section class="dashboard-card trend-card">
+                    <div class="card-heading"><h2>⌁ Incident Trend · Last 12 Hours</h2><span>Hourly</span></div>
+                    <div class="trend-chart" id="trendBars" aria-label="Incident trend over the last 12 hours"></div>
+                </section>
+                <section class="dashboard-card category-card">
+                    <div class="card-heading"><h2>◌ Violations by Category</h2></div>
+                    <div id="categoryBars" class="category-bars"></div>
+                </section>
+            </div>
+
+            <div class="activity-grid">
+                <section class="dashboard-card">
+                    <div class="card-heading"><h2>♙ Seated Candidates</h2><span id="seatedCount">0 active</span></div>
+                    <div id="seatedCandidates" class="empty-panel">No candidates are currently seated at a proctored terminal.</div>
+                    <p class="panel-footnote">Active count is based on recent session heartbeats. Candidate roster details are not exposed by the current audit API.</p>
+                </section>
+                <section class="dashboard-card">
+                    <div class="card-heading"><h2>♢ Recent Incidents</h2><span>Latest records</span></div>
+                    <div id="recentActivity" class="recent-activity"><div class="empty-panel">No incident records yet.</div></div>
+                </section>
+            </div>
+
+            <section class="dashboard-card audit-section">
+                <div class="card-heading audit-heading"><div><h2>Incident Ledger</h2><p>Search and filter recorded proctoring events.</p></div></div>
+                <div class="table-toolbar">
+                    <div class="table-toolbar-left">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Filter by candidate, ID, or violation...">
+                        <select id="violationFilter" class="lang-select">
+                            <option value="ALL">All Violation Categories</option>
+                            <option value="PHONE">Mobile Phone Detected</option>
+                            <option value="BLUR">Terminal Blur / Tab Switch</option>
+                            <option value="GAZE">Looking Off-Screen</option>
+                        </select>
+                    </div>
+                    <span class="ledger-endpoint">Secure audit endpoint · <code>/get-logs</code></span>
                 </div>
-                <div style="font-size:12px; color:var(--ink-muted);">
-                    Direct Backend Endpoint: <code>/get-logs</code>
-                </div>
-            </div>
+                <div class="table-scroll"><table class="audit-table" id="auditTable">
+                    <thead><tr><th>Log ID</th><th>Local Timestamp</th><th>Candidate</th><th>Violation Event</th><th>Record Status</th></tr></thead>
+                    <tbody id="auditTableBody"><tr><td colspan="5" class="empty-state">Waiting for audit records…</td></tr></tbody>
+                </table></div>
+            </section>
+        </section>
 
-            <table class="audit-table" id="auditTable">
-                <thead>
-                    <tr>
-                        <th style="width: 80px;">Log ID</th>
-                        <th style="width: 200px;">Local Timestamp</th>
-                        <th>Student Name</th>
-                        <th style="width: 260px;">Violation Event</th>
-                        <th style="width: 140px;">Database Status</th>
-                    </tr>
-                </thead>
-                <tbody id="auditTableBody">
-                    <tr>
-                        <td colspan="5" class="empty-state">Establishing connection to FastAPI backend at http://127.0.0.1:8000/get-logs...</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+        <section id="setupPanel" class="dashboard-card setup-panel" hidden>
+            <div class="card-heading"><h2>Examination Setup</h2><span>Local server configuration</span></div>
+            <div class="setup-notice"><strong>Configuration is managed on the host machine.</strong><p>For security, examination PINs, faculty credentials, model paths and allowed origins are configured in the server-side <code>.env</code> file. They are intentionally not editable or displayed in this browser dashboard.</p></div>
+            <div class="setup-steps"><div><span>01</span><section><h3>Set examination access PIN</h3><p>Configure <code>EXAM_ACCESS_PIN</code> in the backend environment file.</p></section></div><div><span>02</span><section><h3>Set faculty authorization</h3><p>Configure <code>FACULTY_PIN</code> and keep it private to authorized invigilators.</p></section></div><div><span>03</span><section><h3>Restart and verify</h3><p>Restart the FastAPI service and check the <code>/health</code> endpoint before candidates sign in.</p></section></div></div>
+        </section>
     </main>
-
     <script src="app.js"></script>
 </body>
 </html>
