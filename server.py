@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import base64
 import binascii
 import hashlib
@@ -12,6 +14,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager, contextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -148,6 +151,8 @@ def setup_database() -> None:
         session_columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
         if "completion_reason" not in session_columns:
             conn.execute("ALTER TABLE sessions ADD COLUMN completion_reason TEXT")
+        if "duration_minutes" not in session_columns:
+            conn.execute("ALTER TABLE sessions ADD COLUMN duration_minutes INTEGER NOT NULL DEFAULT 0")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS candidates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -351,6 +356,7 @@ async def authenticate(payload: AuthRequest):
             ).fetchone()
             if not registered:
                 raise HTTPException(status_code=403, detail="Candidate name and seat are not present in the active examination roster.")
+        _expire_sessions(conn)
         conn.execute("UPDATE sessions SET status='ENDED', ended_at=CURRENT_TIMESTAMP WHERE status='ACTIVE' AND last_seen_at < datetime('now','-45 seconds')")
         active = conn.execute(
             "SELECT id FROM sessions WHERE terminal_id=? AND status='ACTIVE' ORDER BY started_at DESC LIMIT 1",
@@ -358,9 +364,11 @@ async def authenticate(payload: AuthRequest):
         ).fetchone()
         if active:
             raise HTTPException(status_code=409, detail="This terminal already has an active examination session.")
+        config_duration = conn.execute("SELECT duration_minutes FROM exam_config WHERE id=1").fetchone()
+        duration_minutes = int(config_duration["duration_minutes"]) if config_duration else 0
         conn.execute(
-            "INSERT INTO sessions (id, student_name, terminal_id) VALUES (?, ?, ?)",
-            (session_id, student_name, terminal_id),
+            "INSERT INTO sessions (id, student_name, terminal_id, duration_minutes) VALUES (?, ?, ?, ?)",
+            (session_id, student_name, terminal_id, duration_minutes),
         )
         conn.commit()
     return {"status": "OK", "session_id": session_id, "student_name": student_name, "terminal_id": terminal_id}
@@ -412,9 +420,20 @@ def has_faculty_session(request: Request) -> bool:
 
 
 
+def _expire_sessions(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        UPDATE sessions SET status='COMPLETED', ended_at=CURRENT_TIMESTAMP,
+            completion_reason='Examination duration elapsed'
+        WHERE status='ACTIVE' AND duration_minutes > 0
+          AND datetime(started_at, '+' || duration_minutes || ' minutes') <= CURRENT_TIMESTAMP
+    """)
+
+
 def _active_session_count() -> int:
     try:
         with db_connection() as conn:
+            _expire_sessions(conn)
+            conn.commit()
             return int(conn.execute(
                 "SELECT COUNT(*) AS n FROM sessions WHERE status='ACTIVE' AND last_seen_at >= datetime('now','-45 seconds')"
             ).fetchone()["n"])
@@ -496,6 +515,8 @@ async def faculty_deactivate_candidate(candidate_id: int, request: Request):
 async def faculty_list_sessions(request: Request):
     require_faculty(request)
     with db_connection() as conn:
+        _expire_sessions(conn)
+        conn.commit()
         rows = conn.execute("""
             SELECT id, student_name, terminal_id, started_at, last_seen_at, ended_at, status, completion_reason
             FROM sessions ORDER BY started_at DESC LIMIT 500
@@ -527,6 +548,26 @@ async def faculty_update_session_status(session_id: str, payload: SessionStatusU
     return {"status": "OK", "session_id": session_id, "attempt_status": payload.status}
 
 
+@app.get("/faculty/export/incidents.csv")
+async def faculty_export_incidents(request: Request):
+    require_faculty(request)
+    def build_csv() -> str:
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Incident ID", "Timestamp", "Candidate", "Terminal", "Violation"])
+        with db_connection() as conn:
+            rows = conn.execute("SELECT id, timestamp, student_name, terminal_id, violation_type FROM violations ORDER BY timestamp DESC").fetchall()
+            for row in rows:
+                writer.writerow([row["id"], row["timestamp"], row["student_name"], row["terminal_id"], row["violation_type"]])
+        return output.getvalue()
+    content = await asyncio.to_thread(build_csv)
+    return Response(
+        content=content,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="lablock-incidents.csv"'},
+    )
+
+
 @app.get("/get-logs")
 async def get_logs_endpoint(request: Request):
     if not has_faculty_session(request):
@@ -553,6 +594,7 @@ async def session_heartbeat(payload: dict):
         raise HTTPException(status_code=400, detail="session_id is required")
     def update():
         with db_connection() as conn:
+            _expire_sessions(conn)
             cursor = conn.execute(
                 "UPDATE sessions SET last_seen_at=CURRENT_TIMESTAMP WHERE id=? AND status='ACTIVE'",
                 (session_id,),
