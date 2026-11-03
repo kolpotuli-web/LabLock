@@ -380,6 +380,7 @@ function connectProctorWebSocket(video, canvas, statusIndicator, statusText) {
                 const bannerText = document.getElementById('securityBannerText');
                 if (bannerText) bannerText.textContent = 'The examination session was closed or expired. Contact the invigilator.';
                 if (banner) banner.classList.add('active');
+                endCandidateSession();
             }
             if (state.sampleTimer) {
                 clearInterval(state.sampleTimer);
