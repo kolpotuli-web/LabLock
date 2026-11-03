@@ -106,10 +106,28 @@
             </section>
         </section>
 
-        <section id="setupPanel" class="dashboard-card setup-panel" hidden>
-            <div class="card-heading"><h2>Examination Setup</h2><span>Local server configuration</span></div>
-            <div class="setup-notice"><strong>Configuration is managed on the host machine.</strong><p>For security, examination PINs, faculty credentials, model paths and allowed origins are configured in the server-side <code>.env</code> file. They are intentionally not editable or displayed in this browser dashboard.</p></div>
-            <div class="setup-steps"><div><span>01</span><section><h3>Set examination access PIN</h3><p>Configure <code>EXAM_ACCESS_PIN</code> in the backend environment file.</p></section></div><div><span>02</span><section><h3>Set faculty authorization</h3><p>Configure <code>FACULTY_PIN</code> and keep it private to authorized invigilators.</p></section></div><div><span>03</span><section><h3>Restart and verify</h3><p>Restart the FastAPI service and check the <code>/health</code> endpoint before candidates sign in.</p></section></div></div>
+        <section id="setupPanel" class="setup-panel" hidden>
+            <section class="dashboard-card setup-form-card">
+                <div class="card-heading"><div><h2>Examination Configuration</h2><p>Control candidate admission and exam duration.</p></div><span>Faculty only</span></div>
+                <form id="examConfigForm" class="setup-form">
+                    <label for="examTitleInput">Examination title</label><input id="examTitleInput" required maxlength="160" placeholder="e.g. Data Structures Practical Examination">
+                    <div class="setup-form-row"><div><label for="examDurationInput">Duration (minutes)</label><input id="examDurationInput" type="number" min="1" max="600" value="60" required></div><div><label for="examStatusInput">Admission status</label><select id="examStatusInput"><option value="OPEN">Open</option><option value="PAUSED">Paused</option><option value="CLOSED">Closed</option></select></div></div>
+                    <div class="setup-form-row"><div><label for="examStartInput">Scheduled start (optional)</label><input id="examStartInput" type="datetime-local"></div><div><label for="examEndInput">Scheduled end (optional)</label><input id="examEndInput" type="datetime-local"></div></div>
+                    <p class="setup-help">Closing or pausing admission prevents new candidate sessions. Existing attempts remain active until faculty finalizes them.</p>
+                    <button class="btn btn-primary" type="submit">Save examination settings</button><span id="examConfigFeedback" class="setup-feedback" role="status"></span>
+                </form>
+            </section>
+            <section class="dashboard-card roster-card">
+                <div class="card-heading"><div><h2>Candidate Roster & Seat Allocation</h2><p>When at least one active roster entry exists, only registered name/seat combinations can sign in.</p></div><span id="rosterCount">0 candidates</span></div>
+                <form id="candidateForm" class="candidate-form"><div><label for="rosterNameInput">Candidate full name</label><input id="rosterNameInput" required maxlength="120" placeholder="As printed on the roster"></div><div><label for="rosterTerminalInput">Seat / terminal ID</label><input id="rosterTerminalInput" required maxlength="80" placeholder="LAB-A-01"></div><button type="submit" class="btn btn-primary">Add candidate</button></form>
+                <p id="rosterFeedback" class="setup-feedback" role="status"></p>
+                <div class="table-scroll"><table class="audit-table"><thead><tr><th>Candidate</th><th>Assigned terminal</th><th>Status</th><th>Action</th></tr></thead><tbody id="rosterTableBody"><tr><td colspan="4" class="empty-state">Loading roster…</td></tr></tbody></table></div>
+            </section>
+            <section class="dashboard-card">
+                <div class="card-heading"><div><h2>Attempt Management</h2><p>Review current and previous candidate sessions.</p></div><button type="button" class="btn btn-primary" id="refreshSessionsBtn">Refresh attempts</button></div>
+                <div class="table-scroll"><table class="audit-table"><thead><tr><th>Candidate</th><th>Terminal</th><th>Started</th><th>Last heartbeat</th><th>Status</th><th>Action</th></tr></thead><tbody id="sessionTableBody"><tr><td colspan="6" class="empty-state">Loading attempts…</td></tr></tbody></table></div>
+            </section>
+            <div class="setup-notice"><strong>Security settings remain server-side.</strong><p>Examination PINs, faculty credentials and model paths are managed in the host machine's <code>.env</code> file and are never exposed in this dashboard.</p></div>
         </section>
     </main>
     <script src="app.js"></script>
