@@ -35,7 +35,7 @@ python -m uvicorn server:app --host 0.0.0.0 --port 8000
 
 - Candidate authentication is checked by the backend; no PIN is accepted based only on client-side length checks.
 - Faculty lockout release is also verified by the backend.
-- Candidate sign-in is throttled per terminal and faculty sign-in per client IP; PIN comparisons use constant-time HMAC comparison.
+- Candidate sign-in is throttled per terminal and per client IP; faculty sign-in is throttled per client IP. PIN comparisons use constant-time HMAC comparison.
 - Candidate sessions expire on the server when their configured duration elapses or their heartbeat is missing for more than 45 seconds. The WebSocket stops processing frames for finalized/expired attempts.
 - Each inference worker owns its own YOLO and MediaPipe instances. This avoids unsafe concurrent access to shared model objects and removes the single global AI mutex bottleneck.
 - AI work runs in a bounded thread pool. Set `LABLOCK_AI_WORKERS` to tune parallel model instances; increasing it increases RAM/VRAM usage.
