@@ -272,18 +272,7 @@ function initStudentTerminal() {
 
     if (resetCodeBtn && codeArea) {
         resetCodeBtn.addEventListener('click', () => {
-            codeArea.value = [
-                'class LRUCache:',
-                '    def __init__(self, capacity: int):',
-                '        self.capacity = capacity',
-                '        self.cache = {}',
-                '',
-                '    def get(self, key: int) -> int:',
-                '        return self.cache.get(key, -1)',
-                '',
-                '    def put(self, key: int, value: int) -> None:',
-                '        self.cache[key] = value'
-            ].join('\n');
+            codeArea.value = '# Write your solution here';
             codeArea.dispatchEvent(new Event('input'));
             appendConsoleOutput('[WORKSPACE]: Code buffer reset to initial skeleton.');
         });
