@@ -1166,3 +1166,21 @@ body {background:#f1f5f9;color:#101a30;font-family:var(--font-ui);}
     .analytics-grid,.activity-grid {grid-template-columns:1fr;}.metrics-grid {gap:9px;}.metric-card {padding:13px;}.metric-label {font-size:10px;}.metric-value {font-size:29px;}
     .category-row {grid-template-columns:108px minmax(35px,1fr) 20px;gap:7px;}.table-toolbar {align-items:stretch;flex-direction:column;}.table-toolbar-left {flex-direction:column;}.search-input {min-width:0;width:100%;}.setup-steps {grid-template-columns:1fr;}
 }
+
+
+.setup-panel {display:flex;flex-direction:column;gap:14px;}
+.setup-form-card,.roster-card {padding:20px;}
+.setup-form,.candidate-form {display:flex;flex-direction:column;gap:9px;max-width:780px;}
+.setup-form label,.candidate-form label {font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#536b88;}
+.setup-form input,.setup-form select,.candidate-form input {height:40px;border:1px solid #d5dfeb;border-radius:4px;background:#fff;padding:0 11px;color:#20344f;font:13px var(--font-ui);width:100%;}
+.setup-form-row {display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.setup-form-row>div,.candidate-form>div {display:flex;flex-direction:column;gap:7px;}
+.setup-help,.setup-feedback {font-size:12px;color:#7186a3;line-height:1.6;}
+.setup-feedback {color:#16734d;min-height:16px;}
+.candidate-form {display:grid;grid-template-columns:minmax(180px,1fr) minmax(140px,.7fr) auto;align-items:end;max-width:none;margin:8px 0;}
+.candidate-form .btn {height:40px;white-space:nowrap;}
+.table-action {border:1px solid #f0b6b9;background:#fff7f7;color:#b91c1c;border-radius:4px;padding:5px 9px;font-size:10px;font-weight:700;cursor:pointer;}
+.table-action:disabled {opacity:.5;cursor:not-allowed;}
+.session-status {display:inline-block;padding:4px 8px;border-radius:12px;background:#eff4fa;color:#45617e;font-size:10px;font-weight:800;text-transform:uppercase;}
+.session-status.active {background:#e8f8f0;color:#14764c;}.session-status.cancelled {background:#fff0f0;color:#b91c1c;}
+@media(max-width:700px){.setup-form-row,.candidate-form{grid-template-columns:1fr;}.candidate-form .btn{width:100%;}}
