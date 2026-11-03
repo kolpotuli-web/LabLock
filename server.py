@@ -756,12 +756,28 @@ async def proctor_endpoint(websocket: WebSocket, student_name: str):
             data = await websocket.receive_text()
             def session_still_active() -> bool:
                 with db_connection() as conn:
-                    _expire_sessions(conn)
+                    active = conn.execute("""
+                        SELECT 1 FROM sessions
+                        WHERE id=? AND status='ACTIVE'
+                          AND last_seen_at >= datetime('now','-45 seconds')
+                          AND (duration_minutes=0 OR
+                               datetime(started_at, '+' || duration_minutes || ' minutes') > CURRENT_TIMESTAMP)
+                    """, (session_id,)).fetchone()
+                    if active:
+                        return True
+                    conn.execute("""
+                        UPDATE sessions SET
+                            status=CASE WHEN duration_minutes > 0
+                                AND datetime(started_at, '+' || duration_minutes || ' minutes') <= CURRENT_TIMESTAMP
+                                THEN 'COMPLETED' ELSE 'ENDED' END,
+                            ended_at=CURRENT_TIMESTAMP,
+                            completion_reason=CASE WHEN duration_minutes > 0
+                                AND datetime(started_at, '+' || duration_minutes || ' minutes') <= CURRENT_TIMESTAMP
+                                THEN 'Examination duration elapsed' ELSE 'Candidate heartbeat timed out' END
+                        WHERE id=? AND status='ACTIVE'
+                    """, (session_id,))
                     conn.commit()
-                    return conn.execute(
-                        "SELECT 1 FROM sessions WHERE id=? AND status='ACTIVE'",
-                        (session_id,),
-                    ).fetchone() is not None
+                    return False
             if not await asyncio.to_thread(session_still_active):
                 await websocket.send_json({"status": "SESSION_ENDED", "message": "This examination attempt is no longer active."})
                 await websocket.close(code=1008, reason="Examination attempt finalized or expired")
