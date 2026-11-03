@@ -264,3 +264,24 @@ def test_authentication_rate_limit(tmp_path, monkeypatch):
             assert client.post("/authenticate", json=payload).status_code == 401
         limited = client.post("/authenticate", json=payload)
         assert limited.status_code == 429
+
+
+def test_candidate_global_ip_rate_limit_cannot_be_bypassed_by_changing_terminal(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "DB_PATH", tmp_path / "global-rate-limit-test.db")
+    monkeypatch.setattr(server, "_auth_failures", {})
+
+    with TestClient(server.app) as client:
+        for index in range(server.CANDIDATE_IP_FAILURE_LIMIT):
+            response = client.post("/authenticate", json={
+                "student_name": "Candidate",
+                "terminal_id": f"LAB-{index:03d}",
+                "pin": "incorrect",
+            })
+            assert response.status_code == 401
+
+        blocked = client.post("/authenticate", json={
+            "student_name": "Candidate",
+            "terminal_id": "LAB-NEW",
+            "pin": "incorrect",
+        })
+        assert blocked.status_code == 429
