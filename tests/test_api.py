@@ -234,3 +234,19 @@ def test_scheduled_exam_rejects_early_candidate_login(tmp_path, monkeypatch):
         })
         assert auth.status_code == 403
         assert "not started" in auth.json()["detail"].lower()
+
+
+def test_authentication_rate_limit(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "DB_PATH", tmp_path / "rate-limit-test.db")
+    monkeypatch.setattr(server, "_auth_failures", {})
+
+    with TestClient(server.app) as client:
+        payload = {
+            "student_name": "Candidate",
+            "terminal_id": "LAB-R-01",
+            "pin": "incorrect",
+        }
+        for _ in range(server.AUTH_FAILURE_LIMIT):
+            assert client.post("/authenticate", json=payload).status_code == 401
+        limited = client.post("/authenticate", json=payload)
+        assert limited.status_code == 429
