@@ -221,10 +221,12 @@ def test_exam_duration_expiry_and_csv_export(tmp_path, monkeypatch):
         assert attempts.json()["sessions"][0]["status"] == "COMPLETED"
         assert attempts.json()["sessions"][0]["completion_reason"] == "Examination duration elapsed"
 
+        server.log_violation_to_db("=1+1", "Test incident", "LAB-T-01")
         export = client.get("/faculty/export/incidents.csv")
         assert export.status_code == 200
         assert "text/csv" in export.headers["content-type"]
         assert export.text.startswith("Incident ID,Timestamp,Candidate,Terminal,Violation")
+        assert "'=1+1" in export.text
 
 
 def test_scheduled_exam_rejects_early_candidate_login(tmp_path, monkeypatch):
