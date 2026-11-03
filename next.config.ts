@@ -1,0 +1,3 @@
+import type { NextConfig } from "next";
+const nextConfig: NextConfig = { output: "standalone", reactStrictMode: false, typescript: { ignoreBuildErrors: true }, async headers() { return [{ source: "/mediapipe/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] }, { source: "/models/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] }]; } };
+export default nextConfig;
