@@ -55,6 +55,10 @@ _active_lock = threading.Lock()
 _active_connections: dict[str, dict[str, Any]] = {}
 _violation_cooldowns: dict[tuple[str, str, str], float] = {}
 _model_load_error: str | None = None
+_auth_attempt_lock = threading.Lock()
+_auth_failures: dict[str, list[float]] = {}
+AUTH_FAILURE_LIMIT = 8
+AUTH_WINDOW_SECONDS = 300
 
 
 class ViolationRequest(BaseModel):
@@ -286,14 +290,36 @@ def log_violation_to_db(student_name: str, violation_type: str, terminal_id: str
         conn.commit()
 
 
+def enforce_auth_rate_limit(key: str) -> None:
+    now = time.monotonic()
+    with _auth_attempt_lock:
+        attempts = [stamp for stamp in _auth_failures.get(key, []) if now - stamp < AUTH_WINDOW_SECONDS]
+        _auth_failures[key] = attempts
+        if len(attempts) >= AUTH_FAILURE_LIMIT:
+            raise HTTPException(status_code=429, detail="Too many failed sign-in attempts. Try again in five minutes.")
+
+
+def record_auth_failure(key: str) -> None:
+    now = time.monotonic()
+    with _auth_attempt_lock:
+        attempts = [stamp for stamp in _auth_failures.get(key, []) if now - stamp < AUTH_WINDOW_SECONDS]
+        attempts.append(now)
+        _auth_failures[key] = attempts
+
+
+def clear_auth_failures(key: str) -> None:
+    with _auth_attempt_lock:
+        _auth_failures.pop(key, None)
+
+
 def authenticate_candidate(payload: AuthRequest) -> bool:
     expected = os.getenv("EXAM_ACCESS_PIN", "")
-    return bool(expected) and payload.pin == expected
+    return bool(expected) and hmac.compare_digest(payload.pin, expected)
 
 
 def authenticate_faculty(payload: FacultyAuthRequest) -> bool:
     expected = os.getenv("FACULTY_PIN", "")
-    return bool(expected) and payload.pin == expected
+    return bool(expected) and hmac.compare_digest(payload.pin, expected)
 
 
 @asynccontextmanager
@@ -337,9 +363,13 @@ async def health():
 
 
 @app.post("/authenticate")
-async def authenticate(payload: AuthRequest):
+async def authenticate(payload: AuthRequest, request: Request):
+    rate_key = "candidate:" + (request.client.host if request.client else "unknown")
+    enforce_auth_rate_limit(rate_key)
     if not authenticate_candidate(payload):
+        record_auth_failure(rate_key)
         raise HTTPException(status_code=401, detail="Invalid examination credentials.")
+    clear_auth_failures(rate_key)
     student_name = payload.student_name.strip()
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
@@ -390,8 +420,12 @@ async def authenticate(payload: AuthRequest):
 
 @app.post("/faculty/unlock")
 async def faculty_unlock(payload: FacultyAuthRequest, request: Request, response: Response):
+    rate_key = "faculty:" + (request.client.host if request.client else "unknown")
+    enforce_auth_rate_limit(rate_key)
     if not authenticate_faculty(payload):
+        record_auth_failure(rate_key)
         raise HTTPException(status_code=401, detail="Invalid faculty authorization key.")
+    clear_auth_failures(rate_key)
     expires = int(time.time()) + 8 * 60 * 60
     secret = os.getenv("LABLOCK_SESSION_SECRET") or os.getenv("FACULTY_PIN", "")
     signature = hmac.new(secret.encode("utf-8"), str(expires).encode("ascii"), hashlib.sha256).hexdigest()
