@@ -54,3 +54,8 @@ Frames are processed in memory and are not saved by this backend. Violation meta
 - If AI is unavailable, verify the YOLO weights path and the installed PyTorch/Ultralytics runtime.
 - If the browser cannot access the camera, use localhost or HTTPS and grant camera permission.
 - Use one backend process for the SQLite database. Multiple Uvicorn workers would each maintain their own in-memory cooldown map and model pool.
+
+
+## Validation
+
+GitHub Actions compiles the Python backend, checks the browser JavaScript syntax, verifies required assets, and runs API integration tests for candidate authentication, session lifecycle, faculty authorization and audit access. The CI runner deliberately does not download or execute the full YOLO/MediaPipe model stack. Validate real-time detection, throughput, camera permissions and memory use on the target lab computers before an examination.
