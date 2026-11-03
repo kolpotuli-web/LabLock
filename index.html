@@ -11,34 +11,16 @@
 </head>
 <body>
 
-    <!-- Top Navigation Bar -->
     <header class="top-navbar">
-        <div class="brand-section">
-            <div class="brand-logo-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-            </div>
-            <span class="brand-name">LabLock</span>
-            <span class="brand-badge">Student Assessment Terminal</span>
-        </div>
-
-        <div class="nav-actions">
-            <div class="meta-pill">
-                <span class="label">Seat ID:</span>
-                <span class="value" id="displayTerminalId">UNASSIGNED</span>
-            </div>
-            <div class="meta-pill">
-                <span class="label">Candidate:</span>
-                <span class="value" id="displayStudentName">UNAUTHENTICATED</span>
-            </div>
-            <div class="meta-pill">
-                <span class="pulse-indicator" id="wsStatusIndicator"></span>
-                <span class="label">Proctor Stream:</span>
-                <span class="value" id="wsStatusText">Unmounted</span>
-            </div>
-        </div>
+        <a class="brand-section" href="index.html" aria-label="LabLock home">
+            <span class="brand-logo-icon" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg></span>
+            <span class="brand-copy"><span class="brand-name">LabLock Examination System</span><span class="brand-badge">Online Proctored Examinations</span></span>
+        </a>
+        <nav class="nav-actions" aria-label="Main navigation">
+            <a href="index.html" class="nav-tab active"><span aria-hidden="true">▣</span> Examination Hall</a>
+            <a href="dashboard.html" class="nav-tab"><span aria-hidden="true">♙</span> Faculty Console</a>
+            <span class="system-status"><span class="pulse-indicator"></span> System Online</span>
+        </nav>
     </header>
 
     <!-- Discreet Dismissible Security Warning Banner -->
@@ -54,49 +36,29 @@
         <button type="button" class="btn btn-danger btn-sm" id="dismissBannerBtn">Acknowledge</button>
     </div>
 
-    <!-- 1. Authentication Gate (IDE and Webcam Streams Completely Unmounted Until Submitted) -->
     <main class="auth-wrapper" id="authGate">
-        <div class="auth-card">
-            <div class="auth-header">
-                <h1>Terminal Authentication Gate</h1>
-                <p>Submit registered laboratory credentials to initialize the proctored assessment environment.</p>
-            </div>
+        <section class="auth-card">
+            <div class="auth-header"><h1>Candidate Login</h1><p>Select your roster entry and allotted seat to start the proctored attempt.</p></div>
             <div class="auth-body">
                 <form id="authForm" autocomplete="off">
-                    <div class="form-group">
-                        <label for="studentNameInput">Student Full Name</label>
-                        <input type="text" id="studentNameInput" class="input-control" placeholder="Enter full registered name" required autocomplete="off">
-                        <div class="form-note">Must match institutional examination registration roster.</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="terminalIdInput">Seat / Terminal Identifier</label>
-                        <input type="text" id="terminalIdInput" class="input-control mono" placeholder="e.g. LAB-B-104" required autocomplete="off">
-                    </div>
-
-                    <div class="form-group">
-                        <label for="accessPinInput">Examination Access PIN</label>
-                        <input type="password" id="accessPinInput" class="input-control mono" placeholder="Enter session access PIN" required autocomplete="off">
-                        <div class="form-note">Provided by the presiding invigilator at the start of the session.</div>
-                    </div>
-
-                    <div id="authError" class="event-pill alert" style="display:none; width:100%; margin-bottom:16px; padding:8px 12px;"></div>
-
-                    <button type="submit" class="btn btn-primary" id="authSubmitBtn" style="width: 100%;">
-                        Authorize &amp; Mount Terminal Workspace
-                    </button>
+                    <div class="form-group"><label for="studentNameInput">Candidate Full Name</label><input type="text" id="studentNameInput" class="input-control" placeholder="As printed on the examination roster" required autocomplete="off"><div class="form-note">The seating roster has not been published yet - enter your name as registered.</div></div>
+                    <div class="form-group"><label for="terminalIdInput">Seat / Lab Computer Number</label><input type="text" id="terminalIdInput" class="input-control" placeholder="e.g. LAB-B-104" required autocomplete="off"><div class="form-note">Faculty has not registered lab computers yet - enter the seat printed on your hall ticket.</div></div>
+                    <div class="form-group"><label for="accessPinInput">Examination Access PIN</label><input type="password" id="accessPinInput" class="input-control mono" placeholder="Provided by the invigilator" required autocomplete="off"></div>
+                    <div id="authError" class="event-pill alert" style="display:none;width:100%;margin-bottom:16px;padding:8px 12px;"></div>
+                    <button type="submit" class="btn btn-primary auth-submit" id="authSubmitBtn"><span aria-hidden="true">⇥</span> Sign in to examination</button>
                 </form>
-
-                <div class="auth-compliance-box">
-                    <strong>Laboratory Assessment Policy:</strong>
-                    <ul>
-                        <li>AI head tracking and peripheral visual telemetry are continuously engaged.</li>
-                        <li>Switching browser tabs or application defocusing will trigger an immediate terminal security lockout.</li>
-                        <li>Mobile phones, wearable smart devices, and unapproved secondary screens are strictly barred.</li>
-                    </ul>
-                </div>
             </div>
-        </div>
+        </section>
+        <aside class="instructions-card">
+            <div class="instructions-heading"><div><h2>Examination Instructions</h2><p>Read carefully before signing in</p></div><span class="mandatory-pill">♧ Mandatory</span></div>
+            <ol class="instruction-list">
+                <li><span class="instruction-number">1</span><div><h3>Continuous identity verification</h3><p>Facial landmark tracking and gaze analysis remain active for the entire duration of the attempt. Covering the camera or leaving the frame is recorded as absence from the examination hall.</p></div></li>
+                <li><span class="instruction-number">2</span><div><h3>Prohibited articles</h3><p>Mobile phones, books, wearable devices and secondary screens are monitored by an automated vision model. A detected phone may be recorded as an examination violation.</p></div></li>
+                <li><span class="instruction-number">3</span><div><h3>Sole occupancy</h3><p>The candidate must be the only person visible in the camera view. Additional people in frame are recorded for faculty review.</p></div></li>
+                <li><span class="instruction-number">4</span><div><h3>Focus discipline</h3><p>Switching tabs, minimizing the window or losing focus on the terminal triggers a security lockout. Releasing the lockout requires faculty authorization.</p></div></li>
+                <li><span class="instruction-number">5</span><div><h3>Evidence and record</h3><p>Reported violations are timestamped and filed in the invigilation record for review by the supervising faculty.</p></div></li>
+            </ol>
+        </aside>
     </main>
 
     <!-- 2. Main Assessment Interface (Mounted Only After Authentication) -->
