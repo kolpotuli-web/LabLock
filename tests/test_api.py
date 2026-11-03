@@ -50,6 +50,7 @@ def test_candidate_faculty_audit_and_session_lifecycle(tmp_path, monkeypatch):
         violation = client.post("/log-violation", json={
             "student_name": "Test Candidate",
             "terminal_id": "LAB-A-01",
+            "session_id": session_id,
             "violation_type": "Test incident",
         })
         assert violation.status_code == 200
