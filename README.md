@@ -91,7 +91,7 @@ All /faculty/* management routes require the HttpOnly faculty session cookie cre
 
 - The app does not currently retain webcam frames or photographic evidence. Only incident metadata is stored. Evidence capture and retention require an explicit institutional privacy/retention policy and secure storage design.
 - The fallback OpenCV face detector cannot estimate gaze. Gaze monitoring requires a compatible MediaPipe installation.
-- Exam scheduling uses the host server's local timezone for schedule values entered without an offset. Keep the server clock synchronized.
+- The faculty dashboard converts scheduled start/end values to timezone-aware UTC timestamps. Keep the host server clock synchronized.
 - Candidate registration is currently one-at-a-time in the dashboard; bulk CSV roster import is not yet implemented.
 - Production use still requires HTTPS, a hardened host, backup/restore procedures, institutional privacy review and supervised multi-terminal hardware testing.
 
