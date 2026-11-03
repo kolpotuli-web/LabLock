@@ -94,3 +94,6 @@ All /faculty/* management routes require the HttpOnly faculty session cookie cre
 - Exam scheduling uses the host server's local timezone for schedule values entered without an offset. Keep the server clock synchronized.
 - Candidate registration is currently one-at-a-time in the dashboard; bulk CSV roster import is not yet implemented.
 - Production use still requires HTTPS, a hardened host, backup/restore procedures, institutional privacy review and supervised multi-terminal hardware testing.
+
+
+The configured problem statement is delivered to the candidate workspace after successful authentication. The workspace shows the configured title, statement and a client-side countdown; the server remains authoritative for duration expiry. If no exam is configured, LabLock uses a 60-minute default session duration and a generic title.
