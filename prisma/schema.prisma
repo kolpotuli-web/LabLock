@@ -1,0 +1,45 @@
+generator client {
+ provider = "prisma-client-js"
+}
+
+datasource db {
+ provider = "sqlite"
+ url = env("DATABASE_URL")
+}
+
+model ProctorSession {
+ id String @id @default(cuid())
+ studentName String
+ terminalId String
+ status String @default("ACTIVE")
+ startedAt DateTime @default(now())
+ lastSeenAt DateTime @default(now())
+ endedAt DateTime?
+ violationCount Int @default(0)
+ cancelReason String?
+}
+model LabSeat {
+ id String @id @default(cuid())
+ seatId String @unique
+ createdAt DateTime @default(now())
+}
+model RosterEntry {
+ id String @id @default(cuid())
+ studentName String @unique
+ seatId String @unique
+ createdAt DateTime @default(now())
+}
+model Violation {
+ id Int @id @default(autoincrement())
+ studentName String
+ terminalId String @default("UNKNOWN")
+ category String
+ violationType String
+ severity String @default("HIGH")
+ detail String @default("")
+ evidencePath String?
+ createdAt DateTime @default(now())
+ @@index([studentName])
+ @@index([category])
+ @@index([createdAt])
+}
