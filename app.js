@@ -158,11 +158,6 @@ function initStudentTerminal() {
                 return;
             }
 
-            if (pinInput.length < 4) {
-                showAuthError('Invalid Access PIN. Please verify credentials with the presiding invigilator.');
-                return;
-            }
-
             if (authError) authError.style.display = 'none';
             const authSubmit = document.getElementById('authSubmitBtn');
             if (authSubmit) authSubmit.disabled = true;
