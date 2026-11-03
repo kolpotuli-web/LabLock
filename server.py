@@ -721,6 +721,18 @@ async def proctor_endpoint(websocket: WebSocket, student_name: str):
     try:
         while True:
             data = await websocket.receive_text()
+            def session_still_active() -> bool:
+                with db_connection() as conn:
+                    _expire_sessions(conn)
+                    conn.commit()
+                    return conn.execute(
+                        "SELECT 1 FROM sessions WHERE id=? AND status='ACTIVE'",
+                        (session_id,),
+                    ).fetchone() is not None
+            if not await asyncio.to_thread(session_still_active):
+                await websocket.send_json({"status": "SESSION_ENDED", "message": "This examination attempt is no longer active."})
+                await websocket.close(code=1008, reason="Examination attempt finalized or expired")
+                break
             now = time.monotonic()
             if now - last_inference < MIN_INFERENCE_INTERVAL:
                 await websocket.send_json({"status": "SKIPPED", "reason": "inference_rate_limit"})
