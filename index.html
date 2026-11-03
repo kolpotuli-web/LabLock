@@ -41,8 +41,8 @@
             <div class="auth-header"><h1>Candidate Login</h1><p>Select your roster entry and allotted seat to start the proctored attempt.</p></div>
             <div class="auth-body">
                 <form id="authForm" autocomplete="off">
-                    <div class="form-group"><label for="studentNameInput">Candidate Full Name</label><input type="text" id="studentNameInput" class="input-control" placeholder="As printed on the examination roster" required autocomplete="off"><div class="form-note">The seating roster has not been published yet - enter your name as registered.</div></div>
-                    <div class="form-group"><label for="terminalIdInput">Seat / Lab Computer Number</label><input type="text" id="terminalIdInput" class="input-control" placeholder="e.g. LAB-B-104" required autocomplete="off"><div class="form-note">Faculty has not registered lab computers yet - enter the seat printed on your hall ticket.</div></div>
+                    <div class="form-group"><label for="studentNameInput">Candidate Full Name</label><input type="text" id="studentNameInput" class="input-control" placeholder="As printed on the examination roster" required autocomplete="off"><div class="form-note">Enter your name exactly as it appears on the examination roster.</div></div>
+                    <div class="form-group"><label for="terminalIdInput">Seat / Lab Computer Number</label><input type="text" id="terminalIdInput" class="input-control" placeholder="e.g. LAB-B-104" required autocomplete="off"><div class="form-note">Enter the terminal ID assigned to you by the invigilator.</div></div>
                     <div class="form-group"><label for="accessPinInput">Examination Access PIN</label><input type="password" id="accessPinInput" class="input-control mono" placeholder="Provided by the invigilator" required autocomplete="off"></div>
                     <div id="authError" class="event-pill alert" style="display:none;width:100%;margin-bottom:16px;padding:8px 12px;"></div>
                     <button type="submit" class="btn btn-primary auth-submit" id="authSubmitBtn"><span aria-hidden="true">⇥</span> Sign in to examination</button>
