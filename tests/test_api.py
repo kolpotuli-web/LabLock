@@ -169,3 +169,37 @@ def test_paused_exam_blocks_new_candidate_sessions(tmp_path, monkeypatch):
             "pin": "test-exam-pin",
         })
         assert auth.status_code == 403
+
+
+def test_exam_duration_expiry_and_csv_export(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "DB_PATH", tmp_path / "duration-test.db")
+
+    with TestClient(server.app) as client:
+        client.post("/faculty/unlock", json={"pin": "test-faculty-pin"})
+        client.put("/faculty/exam", json={
+            "title": "Timed test", "duration_minutes": 1, "status": "OPEN",
+        })
+        auth = client.post("/authenticate", json={
+            "student_name": "Timed Candidate",
+            "terminal_id": "LAB-T-01",
+            "pin": "test-exam-pin",
+        })
+        assert auth.status_code == 200
+        session_id = auth.json()["session_id"]
+
+        with server.db_connection() as conn:
+            conn.execute(
+                "UPDATE sessions SET started_at=datetime('now','-2 minutes') WHERE id=?",
+                (session_id,),
+            )
+            conn.commit()
+
+        attempts = client.get("/faculty/sessions")
+        assert attempts.status_code == 200
+        assert attempts.json()["sessions"][0]["status"] == "COMPLETED"
+        assert attempts.json()["sessions"][0]["completion_reason"] == "Examination duration elapsed"
+
+        export = client.get("/faculty/export/incidents.csv")
+        assert export.status_code == 200
+        assert "text/csv" in export.headers["content-type"]
+        assert export.text.startswith("Incident ID,Timestamp,Candidate,Terminal,Violation")
