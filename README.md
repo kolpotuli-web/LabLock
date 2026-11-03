@@ -81,6 +81,7 @@ A session's duration is captured when the candidate signs in. Expired attempts a
 All /faculty/* management routes require the HttpOnly faculty session cookie created by POST /faculty/unlock.
 
 - GET/PUT /faculty/exam — read/update exam configuration.
+- POST /faculty/logout — revoke the current faculty browser session.
 - GET/POST /faculty/candidates — list/register candidates.
 - DELETE /faculty/candidates/{id} — deactivate a roster entry.
 - GET /faculty/sessions — list recent attempts.
