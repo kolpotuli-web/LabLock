@@ -70,13 +70,24 @@ class ViolationRequest(BaseModel):
     @field_validator("student_name", "violation_type", "terminal_id")
     @classmethod
     def strip_text(cls, value: str) -> str:
-        return value.strip()
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("This field cannot be blank.")
+        return cleaned
 
 
 class AuthRequest(BaseModel):
     student_name: str = Field(min_length=1, max_length=120)
     terminal_id: str = Field(min_length=1, max_length=80)
     pin: str = Field(min_length=1, max_length=128)
+
+    @field_validator("student_name", "terminal_id")
+    @classmethod
+    def clean_auth_text(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("This field cannot be blank.")
+        return cleaned
 
 
 class FacultyAuthRequest(BaseModel):
@@ -90,12 +101,23 @@ class CandidateRegistration(BaseModel):
     @field_validator("student_name", "terminal_id")
     @classmethod
     def clean_registration(cls, value: str) -> str:
-        return value.strip()
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("This field cannot be blank.")
+        return cleaned
 
 
 class ExamConfiguration(BaseModel):
     title: str = Field(min_length=1, max_length=160)
     problem_statement: str = Field(default="", max_length=12000)
+
+    @field_validator("title")
+    @classmethod
+    def clean_exam_title(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            raise ValueError("Examination title cannot be blank.")
+        return cleaned
     duration_minutes: int = Field(ge=1, le=600)
     status: str = Field(default="OPEN", pattern="^(OPEN|PAUSED|CLOSED)$")
     starts_at: str | None = Field(default=None, max_length=40)
