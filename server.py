@@ -344,9 +344,24 @@ async def authenticate(payload: AuthRequest):
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
     with db_connection() as conn:
-        config = conn.execute("SELECT status FROM exam_config WHERE id=1").fetchone()
-        if config and config["status"] != "OPEN":
-            raise HTTPException(status_code=403, detail="The examination is not currently accepting candidates.")
+        config = conn.execute("SELECT status, starts_at, ends_at FROM exam_config WHERE id=1").fetchone()
+        if config:
+            if config["status"] != "OPEN":
+                raise HTTPException(status_code=403, detail="The examination is not currently accepting candidates.")
+            now = datetime.now().astimezone()
+            try:
+                start_at = datetime.fromisoformat(config["starts_at"]) if config["starts_at"] else None
+                end_at = datetime.fromisoformat(config["ends_at"]) if config["ends_at"] else None
+                if start_at and start_at.tzinfo is None:
+                    start_at = start_at.astimezone()
+                if end_at and end_at.tzinfo is None:
+                    end_at = end_at.astimezone()
+            except ValueError as exc:
+                raise HTTPException(status_code=503, detail="Examination schedule configuration is invalid.") from exc
+            if start_at and now < start_at:
+                raise HTTPException(status_code=403, detail="The examination has not started yet.")
+            if end_at and now >= end_at:
+                raise HTTPException(status_code=403, detail="The examination admission window has ended.")
         roster_size = conn.execute("SELECT COUNT(*) AS n FROM candidates").fetchone()["n"]
         if roster_size:
             registered = conn.execute(
