@@ -311,7 +311,6 @@ async def lifespan(_: FastAPI):
             await conn["websocket"].close(code=1001, reason="Server shutting down")
         except Exception:
             pass
-    _ai_executor.shutdown(wait=False, cancel_futures=True)
 
 
 app = FastAPI(title="LabLock Proctoring & Invigilation Engine", lifespan=lifespan)
@@ -348,7 +347,7 @@ async def authenticate(payload: AuthRequest):
         config = conn.execute("SELECT status FROM exam_config WHERE id=1").fetchone()
         if config and config["status"] != "OPEN":
             raise HTTPException(status_code=403, detail="The examination is not currently accepting candidates.")
-        roster_size = conn.execute("SELECT COUNT(*) AS n FROM candidates WHERE active=1").fetchone()["n"]
+        roster_size = conn.execute("SELECT COUNT(*) AS n FROM candidates").fetchone()["n"]
         if roster_size:
             registered = conn.execute(
                 "SELECT 1 FROM candidates WHERE active=1 AND lower(student_name)=lower(?) AND terminal_id=?",
