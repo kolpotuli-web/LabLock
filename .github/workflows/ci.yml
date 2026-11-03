@@ -15,8 +15,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Install lightweight API test dependencies
+        run: python -m pip install "numpy<2" "opencv-python-headless<4.12" fastapi uvicorn pydantic python-dotenv httpx pytest
       - name: Compile Python sources
-        run: python -m compileall -q server.py
+        run: python -m compileall -q server.py tests
+      - name: Run API integration tests
+        run: pytest -q
       - name: Check browser JavaScript syntax
         run: node --check app.js
       - name: Validate required project files
