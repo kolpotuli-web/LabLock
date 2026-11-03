@@ -112,6 +112,7 @@
                 <div class="card-heading"><div><h2>Examination Configuration</h2><p>Control candidate admission and exam duration.</p></div><span>Faculty only</span></div>
                 <form id="examConfigForm" class="setup-form">
                     <label for="examTitleInput">Examination title</label><input id="examTitleInput" required maxlength="160" placeholder="e.g. Data Structures Practical Examination">
+                    <label for="examProblemInput">Problem statement / candidate instructions</label><textarea id="examProblemInput" rows="8" maxlength="12000" placeholder="Enter the task description and requirements candidates should see."></textarea>
                     <div class="setup-form-row"><div><label for="examDurationInput">Duration (minutes)</label><input id="examDurationInput" type="number" min="1" max="600" value="60" required></div><div><label for="examStatusInput">Admission status</label><select id="examStatusInput"><option value="OPEN">Open</option><option value="PAUSED">Paused</option><option value="CLOSED">Closed</option></select></div></div>
                     <div class="setup-form-row"><div><label for="examStartInput">Scheduled start (optional)</label><input id="examStartInput" type="datetime-local"></div><div><label for="examEndInput">Scheduled end (optional)</label><input id="examEndInput" type="datetime-local"></div></div>
                     <p class="setup-help">Closing or pausing admission prevents new candidate sessions. Existing attempts remain active until faculty finalizes them.</p>
