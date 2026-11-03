@@ -41,6 +41,9 @@ const state = {
     lockoutCount: 0,
     logs: [],
     sessionStartTime: null,
+    sessionId: null,
+    sessionHeartbeatTimer: null,
+    reconnectTimer: null,
     totalViolations: 0,
     lastTableHtml: ''
 };
@@ -158,6 +161,22 @@ function initStudentTerminal() {
             }
 
             if (authError) authError.style.display = 'none';
+            const authSubmit = document.getElementById('authSubmitBtn');
+            if (authSubmit) authSubmit.disabled = true;
+            try {
+                const response = await fetch(CONFIG.API_BASE + '/authenticate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ student_name: nameInput, terminal_id: terminalInput, pin: pinInput })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.detail || 'Candidate authentication failed.');
+                state.sessionId = result.session_id;
+            } catch (authErr) {
+                showAuthError(authErr.message || 'Unable to authenticate with the examination server.');
+                if (authSubmit) authSubmit.disabled = false;
+                return;
+            }
 
             state.studentName = nameInput;
             state.terminalId = terminalInput;
@@ -175,6 +194,15 @@ function initStudentTerminal() {
             await startWebcamProctoring();
             initCodeEditor();
             setupSecurityListeners();
+            if (state.sessionHeartbeatTimer) clearInterval(state.sessionHeartbeatTimer);
+            state.sessionHeartbeatTimer = setInterval(() => {
+                if (!state.sessionId) return;
+                fetch(CONFIG.API_BASE + '/session/heartbeat', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: state.sessionId })
+                }).catch(() => {});
+            }, 15000);
+            window.addEventListener('pagehide', endCandidateSession, { once: true });
         });
     }
 
@@ -186,20 +214,26 @@ function initStudentTerminal() {
     }
 
     if (facultyPinForm) {
-        facultyPinForm.addEventListener('submit', (e) => {
+        facultyPinForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const pinVal = document.getElementById('facultyPinInput').value.trim();
             const lockError = document.getElementById('lockoutError');
 
-            if (pinVal.length >= 4) {
+            try {
+                const response = await fetch(CONFIG.API_BASE + '/faculty/unlock', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin: pinVal })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.detail || 'Invalid Faculty Authorization PIN.');
                 state.isLocked = false;
                 lockoutModal.classList.remove('active');
                 document.getElementById('facultyPinInput').value = '';
                 if (lockError) lockError.style.display = 'none';
-                appendConsoleOutput('[SECURITY RESTORED]: Terminal unlocked via authorized Faculty PIN verification.', 'success');
-            } else {
+                appendConsoleOutput('[SECURITY RESTORED]: Faculty authorization verified by backend.', 'success');
+            } catch (authErr) {
                 if (lockError) {
-                    lockError.textContent = 'Invalid Faculty Authorization PIN. Access denied.';
+                    lockError.textContent = authErr.message || 'Faculty verification failed.';
                     lockError.style.display = 'block';
                 }
             }
@@ -230,6 +264,22 @@ function initStudentTerminal() {
             appendConsoleOutput('[WORKSPACE]: Code buffer reset to initial skeleton.');
         });
     }
+}
+
+function endCandidateSession() {
+    if (state.sampleTimer) clearInterval(state.sampleTimer);
+    if (state.pollTimer) clearInterval(state.pollTimer);
+    if (state.sessionHeartbeatTimer) clearInterval(state.sessionHeartbeatTimer);
+    if (state.reconnectTimer) clearTimeout(state.reconnectTimer);
+    state.authenticated = false;
+    if (state.ws && state.ws.readyState <= WebSocket.OPEN) state.ws.close(1000, 'Candidate session ended');
+    if (state.stream) state.stream.getTracks().forEach(track => track.stop());
+    state.stream = null;
+    if (state.sessionId && navigator.sendBeacon) {
+        const payload = new Blob([JSON.stringify({ session_id: state.sessionId })], { type: 'application/json' });
+        navigator.sendBeacon(CONFIG.API_BASE + '/session/end', payload);
+    }
+    state.sessionId = null;
 }
 
 function showAuthError(msg) {
@@ -270,7 +320,7 @@ async function startWebcamProctoring() {
 
 function connectProctorWebSocket(video, canvas, statusIndicator, statusText) {
     const cleanStudentName = encodeURIComponent(state.studentName);
-    const wsUrl = CONFIG.WS_BASE + '/ws/proctor/' + cleanStudentName;
+    const wsUrl = CONFIG.WS_BASE + '/ws/proctor/' + cleanStudentName + '?terminal_id=' + encodeURIComponent(state.terminalId);
 
     try {
         state.ws = new WebSocket(wsUrl);
@@ -286,7 +336,8 @@ function connectProctorWebSocket(video, canvas, statusIndicator, statusText) {
             try {
                 const response = JSON.parse(event.data);
                 if (response.status === 'VIOLATION') {
-                    handleViolationAlert(response.message || 'Policy Non-Compliance Detected');
+                    const messages = Array.isArray(response.messages) ? response.messages : [response.message || 'Policy Non-Compliance Detected'];
+                    messages.forEach(handleViolationAlert);
                 }
             } catch (parseErr) {
                 console.error('Invalid WebSocket payload received:', event.data);
@@ -305,8 +356,9 @@ function connectProctorWebSocket(video, canvas, statusIndicator, statusText) {
                 clearInterval(state.sampleTimer);
                 state.sampleTimer = null;
             }
-            if (state.authenticated) {
-                setTimeout(() => {
+            if (state.authenticated && !state.reconnectTimer) {
+                state.reconnectTimer = setTimeout(() => {
+                    state.reconnectTimer = null;
                     if (state.authenticated && (!state.ws || state.ws.readyState === WebSocket.CLOSED)) {
                         connectProctorWebSocket(video, canvas, statusIndicator, statusText);
                     }
@@ -325,6 +377,7 @@ function startSamplingLoop(videoElement, canvasElement) {
     state.sampleTimer = setInterval(() => {
         if (!state.ws || state.ws.readyState !== WebSocket.OPEN) return;
         if (state.isLocked) return;
+        if (state.ws.bufferedAmount > 1_000_000) return;
 
         if (videoElement && canvasElement && videoElement.videoWidth) {
             const ctx = canvasElement.getContext('2d');
@@ -389,6 +442,7 @@ function setupSecurityListeners() {
 async function dispatchBlurViolation(violationType) {
     const payload = {
         student_name: state.studentName,
+        terminal_id: state.terminalId,
         violation_type: violationType
     };
 
@@ -728,7 +782,7 @@ function initFacultyDashboard() {
     const refreshBtn = document.getElementById('manualRefreshBtn');
 
     fetchAuditLogs();
-    state.pollTimer = setInterval(fetchAuditLogs, CONFIG.POLL_INTERVAL_MS);
+    state.pollTimer = setInterval(() => { if (!document.hidden) fetchAuditLogs(); }, CONFIG.POLL_INTERVAL_MS);
 
     if (searchInput) {
         searchInput.addEventListener('input', () => renderFilteredLogs());
