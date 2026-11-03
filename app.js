@@ -593,6 +593,29 @@ function initFacultyDashboard() {
     if (searchInput) searchInput.addEventListener('input', () => renderFilteredLogs());
     if (filterSelect) filterSelect.addEventListener('change', () => renderFilteredLogs());
     if (refreshBtn) refreshBtn.addEventListener('click', () => fetchAuditLogs());
+    const resetBtn = document.getElementById('resetDashboardBtn');
+    if (resetBtn) resetBtn.addEventListener('click', () => {
+        const search = document.getElementById('searchInput');
+        const filter = document.getElementById('violationFilter');
+        if (search) search.value = '';
+        if (filter) filter.value = 'ALL';
+        renderFilteredLogs();
+        fetchAuditLogs();
+    });
+    document.querySelectorAll('[data-dashboard-tab]').forEach(tab => {
+        tab.addEventListener('click', () => {
+            const setup = tab.dataset.dashboardTab === 'setup';
+            document.querySelectorAll('[data-dashboard-tab]').forEach(item => {
+                const active = item === tab;
+                item.classList.toggle('active', active);
+                item.setAttribute('aria-selected', String(active));
+            });
+            const monitoringPanel = document.getElementById('monitoringPanel');
+            const setupPanel = document.getElementById('setupPanel');
+            if (monitoringPanel) monitoringPanel.hidden = setup;
+            if (setupPanel) setupPanel.hidden = !setup;
+        });
+    });
 }
 
 async function fetchAuditLogs() {
@@ -616,9 +639,13 @@ async function fetchAuditLogs() {
         state.logs = Array.isArray(data.logs) ? data.logs : [];
         state.totalIncidents = Number(data.total_incidents ?? state.logs.length);
         updateDashboardCounters(data.active_terminals);
+        renderDashboardVisuals(data.active_terminals);
         renderFilteredLogs(false);
     } catch (err) {
         updateDashboardCounters(0);
+        renderDashboardVisuals(0);
+        const connection = document.getElementById('dashboardConnection');
+        if (connection) connection.innerHTML = '<span class="pulse-indicator alert"></span> Backend unavailable';
         renderFilteredLogs(true);
     }
 }
@@ -645,6 +672,75 @@ function updateDashboardCounters(serverActiveCount) {
 
     if (phoneElem) phoneElem.textContent = String(phones);
     if (blurElem) blurElem.textContent = String(blurs);
+}
+
+function renderDashboardVisuals(activeCount) {
+    const updated = document.getElementById('dashboardUpdated');
+    if (updated) updated.textContent = new Date().toLocaleTimeString();
+    const connection = document.getElementById('dashboardConnection');
+    if (connection) connection.innerHTML = '<span class="pulse-indicator"></span> Live · auto refresh 2s';
+
+    const categories = [
+        { key: 'phone', label: 'Mobile phone', css: 'phone' },
+        { key: 'blur', label: 'Terminal blur', css: 'blur' },
+        { key: 'gaze', label: 'Off-screen gaze', css: 'gaze' },
+        { key: 'absent', label: 'Candidate absent', css: 'absent' },
+        { key: 'multiple', label: 'Multiple persons', css: 'multiple' }
+    ];
+    const counts = categories.map(category => ({
+        ...category,
+        count: state.logs.filter(log => {
+            const value = String(log.violation_type || '').toLowerCase();
+            if (category.key === 'phone') return value.includes('phone');
+            if (category.key === 'blur') return value.includes('blur') || value.includes('tab');
+            if (category.key === 'gaze') return value.includes('gaze') || value.includes('off-screen');
+            if (category.key === 'absent') return value.includes('absent') || value.includes('absence');
+            return value.includes('multiple');
+        }).length
+    }));
+    const maxCount = Math.max(1, ...counts.map(item => item.count));
+    const categoryHost = document.getElementById('categoryBars');
+    if (categoryHost) categoryHost.innerHTML = counts.map(item =>
+        '<div class="category-row"><span class="category-name">' + item.label + '</span><div class="category-track"><div class="category-fill ' + item.css + '" style="width:' + (item.count ? Math.max(3, item.count / maxCount * 100) : 0) + '%"></div></div><span class="category-count">' + item.count + '</span></div>'
+    ).join('');
+
+    const trendHost = document.getElementById('trendBars');
+    if (trendHost) {
+        const now = Date.now();
+        const buckets = Array.from({ length: 12 }, (_, index) => {
+            const start = now - (11 - index) * 60 * 60 * 1000;
+            return { hour: new Date(start).getHours(), count: 0 };
+        });
+        state.logs.forEach(log => {
+            const stamp = new Date(String(log.timestamp || '').replace(' ', 'T'));
+            if (Number.isNaN(stamp.getTime())) return;
+            const ageHours = (now - stamp.getTime()) / 3600000;
+            if (ageHours >= 0 && ageHours < 12) {
+                const index = 11 - Math.floor(ageHours);
+                if (buckets[index]) buckets[index].count++;
+            }
+        });
+        const max = Math.max(1, ...buckets.map(item => item.count));
+        trendHost.innerHTML = buckets.map(item =>
+            '<div class="trend-column"><div class="trend-bar ' + (item.count ? 'has-events' : '') + '" style="height:' + Math.max(3, item.count / max * 100) + '%" title="' + item.count + ' incidents"></div><span class="trend-label">' + String(item.hour).padStart(2, '0') + '</span></div>'
+        ).join('');
+    }
+
+    const seated = document.getElementById('seatedCandidates');
+    const seatedCount = document.getElementById('seatedCount');
+    const active = Number(activeCount) || 0;
+    if (seatedCount) seatedCount.textContent = active + ' active';
+    if (seated) seated.textContent = active
+        ? active + ' terminal' + (active === 1 ? ' is' : 's are') + ' reporting a recent heartbeat. Candidate names are not included in the current API response.'
+        : 'No candidates are currently seated at a proctored terminal.';
+
+    const recent = document.getElementById('recentActivity');
+    if (recent) {
+        const latest = [...state.logs].slice(0, 5);
+        recent.innerHTML = latest.length ? latest.map(log =>
+            '<div class="activity-item"><div class="activity-main"><strong>' + escapeHtml(log.student_name || 'Unknown candidate') + '</strong><span>' + escapeHtml(log.timestamp || 'Timestamp unavailable') + ' · #' + escapeHtml(String(log.id || '')) + '</span></div><span class="activity-tag">' + escapeHtml(log.violation_type || 'Incident') + '</span></div>'
+        ).join('') : '<div class="empty-panel">No incident records yet.</div>';
+    }
 }
 
 function renderFilteredLogs(isOffline) {
