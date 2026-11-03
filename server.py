@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import hashlib
+import hmac
 import os
 import sqlite3
 import threading
@@ -15,7 +17,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, Field, field_validator
@@ -302,9 +304,16 @@ async def authenticate(payload: AuthRequest):
 
 
 @app.post("/faculty/unlock")
-async def faculty_unlock(payload: FacultyAuthRequest):
+async def faculty_unlock(payload: FacultyAuthRequest, request: Request, response: Response):
     if not authenticate_faculty(payload):
         raise HTTPException(status_code=401, detail="Invalid faculty authorization key.")
+    expires = int(time.time()) + 8 * 60 * 60
+    secret = os.getenv("LABLOCK_SESSION_SECRET") or os.getenv("FACULTY_PIN", "")
+    signature = hmac.new(secret.encode("utf-8"), str(expires).encode("ascii"), hashlib.sha256).hexdigest()
+    response.set_cookie(
+        "lablock_faculty", f"{expires}.{signature}", max_age=8 * 60 * 60,
+        httponly=True, secure=request.url.scheme == "https", samesite="lax", path="/",
+    )
     return {"status": "OK"}
 
 
@@ -315,8 +324,26 @@ async def log_violation_endpoint(payload: ViolationRequest):
     return {"status": "OK"}
 
 
+def has_faculty_session(request: Request) -> bool:
+    token = request.cookies.get("lablock_faculty", "")
+    try:
+        expires_text, supplied = token.split(".", 1)
+        expires = int(expires_text)
+        if expires < int(time.time()):
+            return False
+        secret = os.getenv("LABLOCK_SESSION_SECRET") or os.getenv("FACULTY_PIN", "")
+        if not secret:
+            return False
+        expected = hmac.new(secret.encode("utf-8"), expires_text.encode("ascii"), hashlib.sha256).hexdigest()
+        return hmac.compare_digest(supplied, expected)
+    except (ValueError, TypeError):
+        return False
+
+
 @app.get("/get-logs")
-async def get_logs_endpoint():
+async def get_logs_endpoint(request: Request):
+    if not has_faculty_session(request):
+        raise HTTPException(status_code=401, detail="Faculty authorization required.")
     try:
         def read_logs():
             with db_connection() as conn:
