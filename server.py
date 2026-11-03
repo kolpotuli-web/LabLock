@@ -286,6 +286,7 @@ async def authenticate(payload: AuthRequest):
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
     with db_connection() as conn:
+        conn.execute("UPDATE sessions SET status='ENDED', ended_at=CURRENT_TIMESTAMP WHERE status='ACTIVE' AND last_seen_at < datetime('now','-45 seconds')")
         active = conn.execute(
             "SELECT id FROM sessions WHERE terminal_id=? AND status='ACTIVE' ORDER BY started_at DESC LIMIT 1",
             (terminal_id,),
@@ -323,9 +324,10 @@ async def get_logs_endpoint():
                 active = conn.execute(
                     "SELECT COUNT(*) AS n FROM sessions WHERE status='ACTIVE' AND last_seen_at >= datetime('now','-45 seconds')"
                 ).fetchone()["n"]
-                return [dict(row) for row in rows], int(active)
-        logs, active = await asyncio.to_thread(read_logs)
-        return {"logs": logs, "active_terminals": active}
+                total = conn.execute("SELECT COUNT(*) AS n FROM violations").fetchone()["n"]
+                return [dict(row) for row in rows], int(active), int(total)
+        logs, active, total = await asyncio.to_thread(read_logs)
+        return {"logs": logs, "active_terminals": active, "total_incidents": total}
     except sqlite3.Error as exc:
         raise HTTPException(status_code=503, detail="Audit database temporarily unavailable.") from exc
 
@@ -391,6 +393,18 @@ async def proctor_endpoint(websocket: WebSocket, student_name: str):
             "connected_at": time.time(),
         }
     last_inference = 0.0
+    alert_streaks = {
+        "Mobile Phone Detected": 0,
+        "Candidate Absent / Face Not Detected": 0,
+        "Multiple Persons in Camera View": 0,
+        "Looking Off-Screen": 0,
+    }
+    alert_thresholds = {
+        "Mobile Phone Detected": 2,
+        "Candidate Absent / Face Not Detected": 3,
+        "Multiple Persons in Camera View": 2,
+        "Looking Off-Screen": 2,
+    }
     try:
         while True:
             data = await websocket.receive_text()
@@ -427,11 +441,18 @@ async def proctor_endpoint(websocket: WebSocket, student_name: str):
                 _model_load_error = str(exc)
                 await websocket.send_json({"status": "ERROR", "message": "AI inference temporarily unavailable"})
                 continue
-            for message in alerts:
+            detected = set(alerts)
+            confirmed_alerts = []
+            for message, threshold in alert_thresholds.items():
+                alert_streaks[message] = alert_streaks[message] + 1 if message in detected else 0
+                if alert_streaks[message] >= threshold:
+                    confirmed_alerts.append(message)
+                    alert_streaks[message] = 0
+            for message in confirmed_alerts:
                 if should_log_violation(student_name, terminal_id, message):
                     await asyncio.to_thread(log_violation_to_db, student_name, message, terminal_id)
-            if alerts:
-                await websocket.send_json({"status": "VIOLATION", "messages": alerts, "message": alerts[0]})
+            if confirmed_alerts:
+                await websocket.send_json({"status": "VIOLATION", "messages": confirmed_alerts, "message": confirmed_alerts[0]})
             else:
                 await websocket.send_json({"status": "OK"})
     except WebSocketDisconnect:
