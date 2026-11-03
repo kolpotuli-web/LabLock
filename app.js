@@ -907,6 +907,13 @@ async function facultyApi(path, options = {}) {
     return payload;
 }
 
+function formatDateTimeLocal(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 16);
+}
+
 async function loadExamConfiguration() {
     try {
         const config = await facultyApi('/faculty/exam');
@@ -920,8 +927,8 @@ async function loadExamConfiguration() {
         if (problem) problem.value = config.problem_statement || '';
         if (duration) duration.value = config.duration_minutes || 60;
         if (status) status.value = config.status || 'OPEN';
-        if (start) start.value = config.starts_at ? String(config.starts_at).slice(0, 16) : '';
-        if (end) end.value = config.ends_at ? String(config.ends_at).slice(0, 16) : '';
+        if (start) start.value = config.starts_at ? formatDateTimeLocal(config.starts_at) : '';
+        if (end) end.value = config.ends_at ? formatDateTimeLocal(config.ends_at) : '';
     } catch (error) {
         const feedback = document.getElementById('examConfigFeedback');
         if (feedback) feedback.textContent = error.message;
@@ -936,9 +943,13 @@ async function saveExamConfiguration(event) {
         problem_statement: document.getElementById('examProblemInput').value.trim(),
         duration_minutes: Number(document.getElementById('examDurationInput').value),
         status: document.getElementById('examStatusInput').value,
-        starts_at: document.getElementById('examStartInput').value || null,
-        ends_at: document.getElementById('examEndInput').value || null
+        starts_at: document.getElementById('examStartInput').value ? new Date(document.getElementById('examStartInput').value).toISOString() : null,
+        ends_at: document.getElementById('examEndInput').value ? new Date(document.getElementById('examEndInput').value).toISOString() : null
     };
+    if (payload.starts_at && payload.ends_at && new Date(payload.ends_at) <= new Date(payload.starts_at)) {
+        if (feedback) feedback.textContent = 'The scheduled end must be later than the scheduled start.';
+        return;
+    }
     try {
         await facultyApi('/faculty/exam', { method: 'PUT', body: JSON.stringify(payload) });
         if (feedback) feedback.textContent = 'Examination settings saved.';
