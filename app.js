@@ -356,8 +356,15 @@ async function startWebcamProctoring() {
         state.stream.getVideoTracks().forEach(track => {
             track.addEventListener('ended', () => {
                 if (!state.authenticated) return;
-                triggerLockoutModal('Hardware Policy Violation (Camera Stream Ended)');
-                dispatchBlurViolation('Hardware Policy Violation (Camera Stream Ended)');
+                const reason = 'Hardware Policy Violation (Camera Stream Ended)';
+                triggerLockoutModal(reason);
+                dispatchBlurViolation(reason);
+                state.authenticated = false;
+                endCandidateSession();
+                const banner = document.getElementById('securityBanner');
+                const bannerText = document.getElementById('securityBannerText');
+                if (bannerText) bannerText.textContent = 'Camera stream ended. This attempt has been stopped; contact the invigilator.';
+                if (banner) banner.classList.add('active');
             }, { once: true });
         });
         appendConsoleOutput('[HARDWARE]: MediaDevices camera stream initialized.');
