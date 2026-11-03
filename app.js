@@ -450,6 +450,7 @@ async function dispatchBlurViolation(violationType) {
     const payload = {
         student_name: state.studentName,
         terminal_id: state.terminalId,
+        session_id: state.sessionId,
         violation_type: violationType
     };
 
