@@ -1,0 +1,1 @@
+import {NextResponse} from "next/server";import {verifyFacultyKey} from "@/lib/faculty";export async function POST(req:Request){const {pin}=await req.json();return verifyFacultyKey(String(pin??""))?NextResponse.json({ok:true}):NextResponse.json({error:"Unauthorized"},{status:401})}
