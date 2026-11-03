@@ -27,8 +27,8 @@ except ImportError:
     pass
 
 BASE_PATH = Path(__file__).resolve().parent
-REPOSITORY_ROOT = BASE_PATH.parent
-LEGACY_ASSETS = REPOSITORY_ROOT / "lablock_final"
+REPOSITORY_ROOT = BASE_PATH
+LEGACY_ASSETS = BASE_PATH / "lablock_final"
 DB_PATH = Path(os.getenv("LABLOCK_DB_PATH", str(LEGACY_ASSETS / "lablock.db"))).resolve()
 MODEL_PATH = Path(os.getenv("LABLOCK_MODEL_PATH", str(LEGACY_ASSETS / "yolov8n.pt"))).resolve()
 MAX_AI_WORKERS = max(1, min(4, int(os.getenv("LABLOCK_AI_WORKERS", "2"))))
