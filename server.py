@@ -523,7 +523,7 @@ async def faculty_set_exam(payload: ExamConfiguration, request: Request):
             VALUES (1, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(id) DO UPDATE SET title=excluded.title,
                 problem_statement=excluded.problem_statement, duration_minutes=excluded.duration_minutes,
-                starts_at=excluded.starts_at, ends_at=excluded.ends_at,
+                status=excluded.status, starts_at=excluded.starts_at, ends_at=excluded.ends_at,
                 updated_at=CURRENT_TIMESTAMP
         """, (payload.title.strip(), payload.problem_statement.strip(), payload.duration_minutes,
               payload.status, payload.starts_at, payload.ends_at))
