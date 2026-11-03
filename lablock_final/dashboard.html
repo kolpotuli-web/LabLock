@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LabLock - Faculty Invigilation Console</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Lato:ital,wght@0,300;0,400;0,700;0,900;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <!-- Top Navigation Bar -->
+    <header class="top-navbar">
+        <div class="brand-section">
+            <div class="brand-logo-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="3" width="7" height="7"></rect>
+                    <rect x="14" y="14" width="7" height="7"></rect>
+                    <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+            </div>
+            <span class="brand-name">LabLock</span>
+            <span class="brand-badge">Faculty Invigilation Console</span>
+        </div>
+
+        <div class="nav-actions">
+            <div class="meta-pill">
+                <span class="pulse-indicator"></span>
+                <span class="label">Live Polling:</span>
+                <span class="value">2000ms</span>
+            </div>
+            <a href="index.html" class="btn btn-secondary btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                Student Terminal
+            </a>
+        </div>
+    </header>
+
+    <main class="dashboard-container" id="facultyDashboard">
+        <div class="dashboard-header-row">
+            <div class="dashboard-title-area">
+                <h1>Laboratory Invigilation &amp; Audit Overview</h1>
+                <p>Real-time terminal telemetry, incident logging, and candidate verification audit trail.</p>
+            </div>
+            <div>
+                <button type="button" class="btn btn-secondary btn-sm" id="manualRefreshBtn">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="23 4 23 10 17 10"></polyline>
+                        <polyline points="1 20 1 14 7 14"></polyline>
+                        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                    </svg>
+                    Refresh Audit Feed
+                </button>
+            </div>
+        </div>
+
+        <!-- Telemetry & Metric Highlights -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Active Terminals</div>
+                <div class="metric-value" id="metricActiveTerminals">0</div>
+                <div class="metric-sub">Synchronized with proctoring engine</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Total Logged Incidents</div>
+                <div class="metric-value alert" id="metricTotalIncidents">0</div>
+                <div class="metric-sub">SQLite database records</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Mobile Phone Detections</div>
+                <div class="metric-value alert" id="metricPhoneViolations">0</div>
+                <div class="metric-sub">YOLOv8 visual classifier</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Terminal Blur / Tab Switches</div>
+                <div class="metric-value" id="metricBlurViolations" style="color:var(--warning-ink);">0</div>
+                <div class="metric-sub">Focus guard lockouts</div>
+            </div>
+        </div>
+
+        <!-- Real-Time Audit Log Table -->
+        <div class="table-card">
+            <div class="table-toolbar">
+                <div class="table-toolbar-left">
+                    <input type="text" id="searchInput" class="search-input" placeholder="Filter by candidate, ID, or violation...">
+                    <select id="violationFilter" class="lang-select">
+                        <option value="ALL">All Violation Categories</option>
+                        <option value="PHONE">Mobile Phone Detected</option>
+                        <option value="BLUR">Terminal Blur / Tab Switch</option>
+                        <option value="GAZE">Looking Off-Screen</option>
+                    </select>
+                </div>
+                <div style="font-size:12px; color:var(--ink-muted);">
+                    Direct Backend Endpoint: <code>/get-logs</code>
+                </div>
+            </div>
+
+            <table class="audit-table" id="auditTable">
+                <thead>
+                    <tr>
+                        <th style="width: 80px;">Log ID</th>
+                        <th style="width: 200px;">Local Timestamp</th>
+                        <th>Student Name</th>
+                        <th style="width: 260px;">Violation Event</th>
+                        <th style="width: 140px;">Database Status</th>
+                    </tr>
+                </thead>
+                <tbody id="auditTableBody">
+                    <tr>
+                        <td colspan="5" class="empty-state">Establishing connection to FastAPI backend at http://127.0.0.1:8000/get-logs...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
