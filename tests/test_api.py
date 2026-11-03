@@ -150,6 +150,14 @@ def test_faculty_exam_roster_and_attempt_management(tmp_path, monkeypatch):
         })
         assert denied_after_deactivation.status_code == 403
 
+        reassigned = client.post("/faculty/candidates", json={
+            "student_name": "Replacement Candidate",
+            "terminal_id": "LAB-C-04",
+        })
+        assert reassigned.status_code == 201
+        assert reassigned.json()["student_name"] == "Replacement Candidate"
+        assert reassigned.json()["active"] == 1
+
 
 def test_paused_exam_blocks_new_candidate_sessions(tmp_path, monkeypatch):
     monkeypatch.setattr(server, "DB_PATH", tmp_path / "paused-test.db")
