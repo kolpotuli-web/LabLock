@@ -1,0 +1,1 @@
+import {NextResponse} from "next/server";import {db} from "@/lib/db";export async function POST(req:Request){try{const {sessionId}=await req.json();await db.proctorSession.updateMany({where:{id:sessionId,status:"ACTIVE"},data:{lastSeenAt:new Date()}});return NextResponse.json({ok:true})}catch{return NextResponse.json({ok:true})}}
