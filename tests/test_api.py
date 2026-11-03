@@ -203,3 +203,26 @@ def test_exam_duration_expiry_and_csv_export(tmp_path, monkeypatch):
         assert export.status_code == 200
         assert "text/csv" in export.headers["content-type"]
         assert export.text.startswith("Incident ID,Timestamp,Candidate,Terminal,Violation")
+
+
+def test_scheduled_exam_rejects_early_candidate_login(tmp_path, monkeypatch):
+    monkeypatch.setattr(server, "DB_PATH", tmp_path / "schedule-test.db")
+
+    with TestClient(server.app) as client:
+        client.post("/faculty/unlock", json={"pin": "test-faculty-pin"})
+        saved = client.put("/faculty/exam", json={
+            "title": "Future exam",
+            "duration_minutes": 60,
+            "status": "OPEN",
+            "starts_at": "2999-01-01T09:00",
+            "ends_at": None,
+        })
+        assert saved.status_code == 200
+
+        auth = client.post("/authenticate", json={
+            "student_name": "Early Candidate",
+            "terminal_id": "LAB-F-01",
+            "pin": "test-exam-pin",
+        })
+        assert auth.status_code == 403
+        assert "not started" in auth.json()["detail"].lower()
