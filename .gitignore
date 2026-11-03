@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.log
+lablock_final/lablock.db
+lablock_final/lablock.db-shm
+lablock_final/lablock.db-wal
