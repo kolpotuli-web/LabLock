@@ -674,6 +674,18 @@ function initFacultyDashboard() {
     if (rosterBody) rosterBody.addEventListener('click', handleRosterAction);
     const sessionBody = document.getElementById('sessionTableBody');
     if (sessionBody) sessionBody.addEventListener('click', handleSessionAction);
+    const logoutBtn = document.getElementById('facultyLogoutBtn');
+    if (logoutBtn) logoutBtn.addEventListener('click', async () => {
+        try { await facultyApi('/faculty/logout', { method: 'POST' }); } catch (error) { console.warn('Faculty logout request failed:', error); }
+        if (state.pollTimer) clearInterval(state.pollTimer);
+        state.pollTimer = null;
+        const gate = document.getElementById('facultyAuthGate');
+        const panel = document.getElementById('facultyDashboard');
+        if (panel) panel.style.display = 'none';
+        if (gate) gate.style.display = 'block';
+        const pin = document.getElementById('facultyDashboardPin');
+        if (pin) pin.value = '';
+    });
     const resetBtn = document.getElementById('resetDashboardBtn');
     if (resetBtn) resetBtn.addEventListener('click', () => {
         const search = document.getElementById('searchInput');
