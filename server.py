@@ -219,7 +219,7 @@ def should_log_violation(student_name: str, terminal_id: str, violation_type: st
 
 
 def log_violation_to_db(student_name: str, violation_type: str, terminal_id: str = "UNKNOWN") -> None:
-    with _db_write_lock, _connect_db() as conn:
+    with _db_write_lock, db_connection() as conn:
         conn.execute(
             "INSERT INTO violations (student_name, violation_type, terminal_id) VALUES (?, ?, ?)",
             (student_name, violation_type, terminal_id),
