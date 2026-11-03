@@ -423,6 +423,7 @@ async def authenticate(payload: AuthRequest, request: Request):
     return {
         "status": "OK", "session_id": session_id, "student_name": student_name,
         "terminal_id": terminal_id, "exam_title": exam_title,
+        "problem_statement": config["problem_statement"] if config else "",
         "duration_minutes": duration_minutes,
     }
 
