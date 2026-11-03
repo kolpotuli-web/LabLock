@@ -663,6 +663,7 @@ async function fetchAuditLogs() {
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
         state.logs = Array.isArray(data.logs) ? data.logs : [];
+        loadFacultySessions();
         state.totalIncidents = Number(data.total_incidents ?? state.logs.length);
         updateDashboardCounters(data.active_terminals);
         renderDashboardVisuals(data.active_terminals);
@@ -943,6 +944,13 @@ async function loadFacultySessions() {
     try {
         const data = await facultyApi('/faculty/sessions');
         const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+        const activeSessions = sessions.filter(session => session.status === 'ACTIVE');
+        const seatedCount = document.getElementById('seatedCount');
+        const seatedHost = document.getElementById('seatedCandidates');
+        if (seatedCount) seatedCount.textContent = activeSessions.length + ' active';
+        if (seatedHost) seatedHost.innerHTML = activeSessions.length ? activeSessions.map(session =>
+            '<div class="activity-item"><div class="activity-main"><strong>' + escapeHtml(session.student_name) + '</strong><span>' + escapeHtml(session.terminal_id) + ' · Started ' + escapeHtml(session.started_at || '—') + '</span></div><span class="activity-tag">ACTIVE</span></div>'
+        ).join('') : 'No candidates are currently seated at a proctored terminal.';
         body.innerHTML = sessions.length ? sessions.map(session => {
             const status = String(session.status || 'UNKNOWN');
             const canFinalize = status === 'ACTIVE' || status === 'ENDED';
