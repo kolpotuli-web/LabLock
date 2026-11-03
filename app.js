@@ -602,6 +602,15 @@ async function fetchAuditLogs() {
             headers: { 'Accept': 'application/json' },
             credentials: 'include'
         });
+        if (response.status === 401) {
+            const gate = document.getElementById('facultyAuthGate');
+            const dashboard = document.getElementById('facultyDashboard');
+            if (gate) gate.style.display = 'block';
+            if (dashboard) dashboard.style.display = 'none';
+            if (state.pollTimer) clearInterval(state.pollTimer);
+            state.pollTimer = null;
+            return;
+        }
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
         state.logs = Array.isArray(data.logs) ? data.logs : [];
