@@ -24,7 +24,7 @@ from pydantic import BaseModel, Field, field_validator
 
 try:
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+    load_dotenv(Path(__file__).resolve().parent / ".env")
 except ImportError:
     pass
 
@@ -33,7 +33,10 @@ REPOSITORY_ROOT = BASE_PATH
 LEGACY_ASSETS = BASE_PATH / "lablock_final"
 DB_PATH = Path(os.getenv("LABLOCK_DB_PATH", str(LEGACY_ASSETS / "lablock.db"))).resolve()
 MODEL_PATH = Path(os.getenv("LABLOCK_MODEL_PATH", str(LEGACY_ASSETS / "yolov8n.pt"))).resolve()
-MAX_AI_WORKERS = max(1, min(4, int(os.getenv("LABLOCK_AI_WORKERS", "2"))))
+try:
+    MAX_AI_WORKERS = max(1, min(4, int(os.getenv("LABLOCK_AI_WORKERS", "2"))))
+except ValueError:
+    MAX_AI_WORKERS = 2
 MAX_FRAME_BYTES = 2_000_000
 MAX_FRAME_WIDTH = 1280
 MAX_FRAME_HEIGHT = 960
@@ -71,6 +74,29 @@ class AuthRequest(BaseModel):
 
 class FacultyAuthRequest(BaseModel):
     pin: str = Field(min_length=1, max_length=128)
+
+
+class CandidateRegistration(BaseModel):
+    student_name: str = Field(min_length=1, max_length=120)
+    terminal_id: str = Field(min_length=1, max_length=80)
+
+    @field_validator("student_name", "terminal_id")
+    @classmethod
+    def clean_registration(cls, value: str) -> str:
+        return value.strip()
+
+
+class ExamConfiguration(BaseModel):
+    title: str = Field(min_length=1, max_length=160)
+    duration_minutes: int = Field(ge=1, le=600)
+    status: str = Field(default="OPEN", pattern="^(OPEN|PAUSED|CLOSED)$")
+    starts_at: str | None = Field(default=None, max_length=40)
+    ends_at: str | None = Field(default=None, max_length=40)
+
+
+class SessionStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(COMPLETED|CANCELLED)$")
+    reason: str | None = Field(default=None, max_length=240)
 
 
 def _connect_db() -> sqlite3.Connection:
@@ -119,6 +145,30 @@ def setup_database() -> None:
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_active ON sessions(status, last_seen_at)")
+        session_columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)")}
+        if "completion_reason" not in session_columns:
+            conn.execute("ALTER TABLE sessions ADD COLUMN completion_reason TEXT")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS candidates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_name TEXT NOT NULL,
+                terminal_id TEXT NOT NULL UNIQUE,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_candidates_name ON candidates(student_name)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS exam_config (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                title TEXT NOT NULL,
+                duration_minutes INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'OPEN',
+                starts_at TEXT,
+                ends_at TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
         conn.commit()
 
 
@@ -278,7 +328,7 @@ async def health():
         "ai_ready": _model_load_error is None,
         "ai_error": _model_load_error,
         "ai_workers": MAX_AI_WORKERS,
-        "active_terminals": len(_active_connections),
+        "active_terminals": _active_session_count(),
     }
 
 
@@ -290,6 +340,17 @@ async def authenticate(payload: AuthRequest):
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
     with db_connection() as conn:
+        config = conn.execute("SELECT status FROM exam_config WHERE id=1").fetchone()
+        if config and config["status"] != "OPEN":
+            raise HTTPException(status_code=403, detail="The examination is not currently accepting candidates.")
+        roster_size = conn.execute("SELECT COUNT(*) AS n FROM candidates WHERE active=1").fetchone()["n"]
+        if roster_size:
+            registered = conn.execute(
+                "SELECT 1 FROM candidates WHERE active=1 AND lower(student_name)=lower(?) AND terminal_id=?",
+                (student_name, terminal_id),
+            ).fetchone()
+            if not registered:
+                raise HTTPException(status_code=403, detail="Candidate name and seat are not present in the active examination roster.")
         conn.execute("UPDATE sessions SET status='ENDED', ended_at=CURRENT_TIMESTAMP WHERE status='ACTIVE' AND last_seen_at < datetime('now','-45 seconds')")
         active = conn.execute(
             "SELECT id FROM sessions WHERE terminal_id=? AND status='ACTIVE' ORDER BY started_at DESC LIMIT 1",
@@ -348,6 +409,122 @@ def has_faculty_session(request: Request) -> bool:
         return hmac.compare_digest(supplied, expected)
     except (ValueError, TypeError):
         return False
+
+
+
+def _active_session_count() -> int:
+    try:
+        with db_connection() as conn:
+            return int(conn.execute(
+                "SELECT COUNT(*) AS n FROM sessions WHERE status='ACTIVE' AND last_seen_at >= datetime('now','-45 seconds')"
+            ).fetchone()["n"])
+    except sqlite3.Error:
+        return 0
+
+
+def require_faculty(request: Request) -> None:
+    if not has_faculty_session(request):
+        raise HTTPException(status_code=401, detail="Faculty authorization required.")
+
+
+@app.get("/faculty/exam")
+async def faculty_get_exam(request: Request):
+    require_faculty(request)
+    with db_connection() as conn:
+        row = conn.execute("SELECT * FROM exam_config WHERE id=1").fetchone()
+        return dict(row) if row else {
+            "id": 1, "title": "LabLock Examination", "duration_minutes": 60,
+            "status": "OPEN", "starts_at": None, "ends_at": None, "updated_at": None,
+        }
+
+
+@app.put("/faculty/exam")
+async def faculty_set_exam(payload: ExamConfiguration, request: Request):
+    require_faculty(request)
+    with db_connection() as conn:
+        conn.execute("""
+            INSERT INTO exam_config (id, title, duration_minutes, status, starts_at, ends_at, updated_at)
+            VALUES (1, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET title=excluded.title,
+                duration_minutes=excluded.duration_minutes, status=excluded.status,
+                starts_at=excluded.starts_at, ends_at=excluded.ends_at,
+                updated_at=CURRENT_TIMESTAMP
+        """, (payload.title.strip(), payload.duration_minutes, payload.status,
+              payload.starts_at, payload.ends_at))
+        conn.commit()
+        return dict(conn.execute("SELECT * FROM exam_config WHERE id=1").fetchone())
+
+
+@app.get("/faculty/candidates")
+async def faculty_list_candidates(request: Request):
+    require_faculty(request)
+    with db_connection() as conn:
+        rows = conn.execute("SELECT * FROM candidates ORDER BY student_name COLLATE NOCASE").fetchall()
+        return {"candidates": [dict(row) for row in rows]}
+
+
+@app.post("/faculty/candidates", status_code=201)
+async def faculty_add_candidate(payload: CandidateRegistration, request: Request):
+    require_faculty(request)
+    name = payload.student_name.strip()
+    terminal = payload.terminal_id.strip().upper()
+    if not name or not terminal:
+        raise HTTPException(status_code=422, detail="Candidate name and terminal are required.")
+    try:
+        with db_connection() as conn:
+            cursor = conn.execute(
+                "INSERT INTO candidates (student_name, terminal_id) VALUES (?, ?)", (name, terminal)
+            )
+            conn.commit()
+            return dict(conn.execute("SELECT * FROM candidates WHERE id=?", (cursor.lastrowid,)).fetchone())
+    except sqlite3.IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="That terminal is already assigned in the roster.") from exc
+
+
+@app.delete("/faculty/candidates/{candidate_id}")
+async def faculty_deactivate_candidate(candidate_id: int, request: Request):
+    require_faculty(request)
+    with db_connection() as conn:
+        cursor = conn.execute("UPDATE candidates SET active=0 WHERE id=?", (candidate_id,))
+        conn.commit()
+        if not cursor.rowcount:
+            raise HTTPException(status_code=404, detail="Candidate not found.")
+    return {"status": "OK", "candidate_id": candidate_id, "active": False}
+
+
+@app.get("/faculty/sessions")
+async def faculty_list_sessions(request: Request):
+    require_faculty(request)
+    with db_connection() as conn:
+        rows = conn.execute("""
+            SELECT id, student_name, terminal_id, started_at, last_seen_at, ended_at, status, completion_reason
+            FROM sessions ORDER BY started_at DESC LIMIT 500
+        """).fetchall()
+        return {"sessions": [dict(row) for row in rows]}
+
+
+@app.post("/faculty/sessions/{session_id}/status")
+async def faculty_update_session_status(session_id: str, payload: SessionStatusUpdate, request: Request):
+    require_faculty(request)
+    with db_connection() as conn:
+        cursor = conn.execute("""
+            UPDATE sessions SET status=?, ended_at=CURRENT_TIMESTAMP, completion_reason=?
+            WHERE id=? AND status IN ('ACTIVE','ENDED')
+        """, (payload.status, payload.reason, session_id))
+        conn.commit()
+        if not cursor.rowcount:
+            exists = conn.execute("SELECT 1 FROM sessions WHERE id=?", (session_id,)).fetchone()
+            if not exists:
+                raise HTTPException(status_code=404, detail="Session not found.")
+            raise HTTPException(status_code=409, detail="This attempt is already finalized.")
+    with _active_lock:
+        for connection in list(_active_connections.values()):
+            if connection.get("session_id") == session_id:
+                try:
+                    asyncio.create_task(connection["websocket"].close(code=1008, reason="Attempt finalized by faculty"))
+                except RuntimeError:
+                    pass
+    return {"status": "OK", "session_id": session_id, "attempt_status": payload.status}
 
 
 @app.get("/get-logs")
@@ -426,6 +603,7 @@ async def proctor_endpoint(websocket: WebSocket, student_name: str):
         _active_connections[connection_id] = {
             "student_name": student_name[:120],
             "terminal_id": terminal_id,
+            "session_id": session_id,
             "websocket": websocket,
             "connected_at": time.time(),
         }
