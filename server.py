@@ -485,6 +485,11 @@ def _expire_sessions(conn: sqlite3.Connection) -> None:
         WHERE status='ACTIVE' AND duration_minutes > 0
           AND datetime(started_at, '+' || duration_minutes || ' minutes') <= CURRENT_TIMESTAMP
     """)
+    conn.execute("""
+        UPDATE sessions SET status='ENDED', ended_at=CURRENT_TIMESTAMP,
+            completion_reason='Candidate heartbeat timed out'
+        WHERE status='ACTIVE' AND last_seen_at < datetime('now','-45 seconds')
+    """)
 
 
 def _active_session_count() -> int:
