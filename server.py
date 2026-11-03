@@ -9,7 +9,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -76,12 +76,6 @@ def _connect_db() -> sqlite3.Connection:
     conn.execute("PRAGMA busy_timeout=20000")
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
-
-@asynccontextmanager
-async def _unused_async_context():
-    yield
-
-from contextlib import contextmanager
 
 @contextmanager
 def db_connection():
