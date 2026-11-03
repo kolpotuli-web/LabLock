@@ -562,26 +562,44 @@ function initFacultyDashboard() {
     const searchInput = document.getElementById('searchInput');
     const filterSelect = document.getElementById('violationFilter');
     const refreshBtn = document.getElementById('manualRefreshBtn');
-
-    fetchAuditLogs();
-    state.pollTimer = setInterval(() => { if (!document.hidden) fetchAuditLogs(); }, CONFIG.POLL_INTERVAL_MS);
-
-    if (searchInput) {
-        searchInput.addEventListener('input', () => renderFilteredLogs());
+    const authGate = document.getElementById('facultyAuthGate');
+    const dashboard = document.getElementById('facultyDashboard');
+    const authForm = document.getElementById('facultyAuthForm');
+    if (authForm) {
+        authForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const pin = document.getElementById('facultyDashboardPin').value;
+            const error = document.getElementById('facultyAuthError');
+            try {
+                const response = await fetch(CONFIG.API_BASE + '/faculty/unlock', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pin })
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.detail || 'Faculty authorization failed.');
+                if (authGate) authGate.style.display = 'none';
+                if (dashboard) dashboard.style.display = 'block';
+                fetchAuditLogs();
+                if (!state.pollTimer) state.pollTimer = setInterval(() => {
+                    if (!document.hidden) fetchAuditLogs();
+                }, CONFIG.POLL_INTERVAL_MS);
+            } catch (authErr) {
+                if (error) { error.textContent = authErr.message || 'Faculty authorization failed.'; error.style.display = 'block'; }
+            }
+        });
     }
-    if (filterSelect) {
-        filterSelect.addEventListener('change', () => renderFilteredLogs());
-    }
-    if (refreshBtn) {
-        refreshBtn.addEventListener('click', () => fetchAuditLogs());
-    }
+    if (searchInput) searchInput.addEventListener('input', () => renderFilteredLogs());
+    if (filterSelect) filterSelect.addEventListener('change', () => renderFilteredLogs());
+    if (refreshBtn) refreshBtn.addEventListener('click', () => fetchAuditLogs());
 }
 
 async function fetchAuditLogs() {
     try {
         const response = await fetch(CONFIG.API_BASE + '/get-logs', {
             method: 'GET',
-            headers: { 'Accept': 'application/json' }
+            headers: { 'Accept': 'application/json' },
+            credentials: 'include'
         });
         if (!response.ok) throw new Error('HTTP ' + response.status);
         const data = await response.json();
