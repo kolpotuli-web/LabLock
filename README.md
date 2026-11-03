@@ -59,3 +59,38 @@ Frames are processed in memory and are not saved by this backend. Violation meta
 ## Validation
 
 GitHub Actions compiles the Python backend, checks the browser JavaScript syntax, verifies required assets, and runs API integration tests for candidate authentication, session lifecycle, faculty authorization and audit access. The CI runner deliberately does not download or execute the full YOLO/MediaPipe model stack. Validate real-time detection, throughput, camera permissions and memory use on the target lab computers before an examination.
+
+
+## Examination management
+
+After faculty authentication, the dashboard's **Examination Setup** tab provides:
+
+- Exam title, duration and admission state (OPEN, PAUSED or CLOSED).
+- Optional scheduled start and end times. Candidate sign-in is rejected outside the configured admission window.
+- Candidate roster registration with a unique lab terminal assignment.
+- Candidate deactivation and seat reassignment.
+- Session history and faculty completion/cancellation controls.
+- CSV export of the complete incident ledger.
+
+When the first candidate is registered, the roster becomes authoritative: only active name/terminal combinations can authenticate. Deactivating every entry does not silently disable roster enforcement. A terminal can be reassigned after its previous entry is deactivated.
+
+A session's duration is captured when the candidate signs in. Expired attempts are automatically marked COMPLETED on subsequent server activity. Faculty can finalize active or ended attempts as COMPLETED or CANCELLED. The browser code runner remains disabled until a separately deployed, hardened execution sandbox is available.
+
+### Faculty API
+
+All /faculty/* management routes require the HttpOnly faculty session cookie created by POST /faculty/unlock.
+
+- GET/PUT /faculty/exam — read/update exam configuration.
+- GET/POST /faculty/candidates — list/register candidates.
+- DELETE /faculty/candidates/{id} — deactivate a roster entry.
+- GET /faculty/sessions — list recent attempts.
+- POST /faculty/sessions/{id}/status — finalize an attempt.
+- GET /faculty/export/incidents.csv — download incident records.
+
+## Operational limitations
+
+- The app does not currently retain webcam frames or photographic evidence. Only incident metadata is stored. Evidence capture and retention require an explicit institutional privacy/retention policy and secure storage design.
+- The fallback OpenCV face detector cannot estimate gaze. Gaze monitoring requires a compatible MediaPipe installation.
+- Exam scheduling uses the host server's local timezone for schedule values entered without an offset. Keep the server clock synchronized.
+- Candidate registration is currently one-at-a-time in the dashboard; bulk CSV roster import is not yet implemented.
+- Production use still requires HTTPS, a hardened host, backup/restore procedures, institutional privacy review and supervised multi-terminal hardware testing.
