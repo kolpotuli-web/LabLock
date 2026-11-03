@@ -503,15 +503,23 @@ async def faculty_add_candidate(payload: CandidateRegistration, request: Request
     terminal = payload.terminal_id.strip().upper()
     if not name or not terminal:
         raise HTTPException(status_code=422, detail="Candidate name and terminal are required.")
-    try:
-        with db_connection() as conn:
+    with db_connection() as conn:
+        existing = conn.execute("SELECT id, active FROM candidates WHERE terminal_id=?", (terminal,)).fetchone()
+        if existing and existing["active"]:
+            raise HTTPException(status_code=409, detail="That terminal is already assigned to an active roster entry.")
+        if existing:
+            conn.execute(
+                "UPDATE candidates SET student_name=?, active=1, created_at=CURRENT_TIMESTAMP WHERE id=?",
+                (name, existing["id"]),
+            )
+            candidate_id = existing["id"]
+        else:
             cursor = conn.execute(
                 "INSERT INTO candidates (student_name, terminal_id) VALUES (?, ?)", (name, terminal)
             )
-            conn.commit()
-            return dict(conn.execute("SELECT * FROM candidates WHERE id=?", (cursor.lastrowid,)).fetchone())
-    except sqlite3.IntegrityError as exc:
-        raise HTTPException(status_code=409, detail="That terminal is already assigned in the roster.") from exc
+            candidate_id = cursor.lastrowid
+        conn.commit()
+        return dict(conn.execute("SELECT * FROM candidates WHERE id=?", (candidate_id,)).fetchone())
 
 
 @app.delete("/faculty/candidates/{candidate_id}")
