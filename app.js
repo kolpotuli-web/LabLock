@@ -582,6 +582,9 @@ function initFacultyDashboard() {
                 if (authGate) authGate.style.display = 'none';
                 if (dashboard) dashboard.style.display = 'block';
                 fetchAuditLogs();
+                loadExamConfiguration();
+                loadCandidateRoster();
+                loadFacultySessions();
                 if (!state.pollTimer) state.pollTimer = setInterval(() => {
                     if (!document.hidden) fetchAuditLogs();
                 }, CONFIG.POLL_INTERVAL_MS);
@@ -593,6 +596,16 @@ function initFacultyDashboard() {
     if (searchInput) searchInput.addEventListener('input', () => renderFilteredLogs());
     if (filterSelect) filterSelect.addEventListener('change', () => renderFilteredLogs());
     if (refreshBtn) refreshBtn.addEventListener('click', () => fetchAuditLogs());
+    const examForm = document.getElementById('examConfigForm');
+    if (examForm) examForm.addEventListener('submit', saveExamConfiguration);
+    const candidateForm = document.getElementById('candidateForm');
+    if (candidateForm) candidateForm.addEventListener('submit', addRosterCandidate);
+    const sessionsRefresh = document.getElementById('refreshSessionsBtn');
+    if (sessionsRefresh) sessionsRefresh.addEventListener('click', loadFacultySessions);
+    const rosterBody = document.getElementById('rosterTableBody');
+    if (rosterBody) rosterBody.addEventListener('click', handleRosterAction);
+    const sessionBody = document.getElementById('sessionTableBody');
+    if (sessionBody) sessionBody.addEventListener('click', handleSessionAction);
     const resetBtn = document.getElementById('resetDashboardBtn');
     if (resetBtn) resetBtn.addEventListener('click', () => {
         const search = document.getElementById('searchInput');
@@ -614,6 +627,11 @@ function initFacultyDashboard() {
             const setupPanel = document.getElementById('setupPanel');
             if (monitoringPanel) monitoringPanel.hidden = setup;
             if (setupPanel) setupPanel.hidden = !setup;
+            if (setup) {
+                loadExamConfiguration();
+                loadCandidateRoster();
+                loadFacultySessions();
+            }
         });
     });
 }
@@ -813,6 +831,134 @@ function renderFilteredLogs(isOffline) {
     if (state.lastTableHtml !== rowsHtml) {
         tbody.innerHTML = rowsHtml;
         state.lastTableHtml = rowsHtml;
+    }
+}
+
+async function facultyApi(path, options = {}) {
+    const response = await fetch(CONFIG.API_BASE + path, {
+        credentials: 'include',
+        headers: { 'Accept': 'application/json', ...(options.body ? { 'Content-Type': 'application/json' } : {}) },
+        ...options
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.detail || 'Faculty request failed (' + response.status + ').');
+    return payload;
+}
+
+async function loadExamConfiguration() {
+    try {
+        const config = await facultyApi('/faculty/exam');
+        const title = document.getElementById('examTitleInput');
+        const duration = document.getElementById('examDurationInput');
+        const status = document.getElementById('examStatusInput');
+        const start = document.getElementById('examStartInput');
+        const end = document.getElementById('examEndInput');
+        if (title) title.value = config.title || '';
+        if (duration) duration.value = config.duration_minutes || 60;
+        if (status) status.value = config.status || 'OPEN';
+        if (start) start.value = config.starts_at ? String(config.starts_at).slice(0, 16) : '';
+        if (end) end.value = config.ends_at ? String(config.ends_at).slice(0, 16) : '';
+    } catch (error) {
+        const feedback = document.getElementById('examConfigFeedback');
+        if (feedback) feedback.textContent = error.message;
+    }
+}
+
+async function saveExamConfiguration(event) {
+    event.preventDefault();
+    const feedback = document.getElementById('examConfigFeedback');
+    const payload = {
+        title: document.getElementById('examTitleInput').value.trim(),
+        duration_minutes: Number(document.getElementById('examDurationInput').value),
+        status: document.getElementById('examStatusInput').value,
+        starts_at: document.getElementById('examStartInput').value || null,
+        ends_at: document.getElementById('examEndInput').value || null
+    };
+    try {
+        await facultyApi('/faculty/exam', { method: 'PUT', body: JSON.stringify(payload) });
+        if (feedback) feedback.textContent = 'Examination settings saved.';
+    } catch (error) {
+        if (feedback) feedback.textContent = error.message;
+    }
+}
+
+async function loadCandidateRoster() {
+    const body = document.getElementById('rosterTableBody');
+    if (!body) return;
+    try {
+        const data = await facultyApi('/faculty/candidates');
+        const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+        const count = document.getElementById('rosterCount');
+        if (count) count.textContent = candidates.filter(item => item.active).length + ' active / ' + candidates.length + ' total';
+        body.innerHTML = candidates.length ? candidates.map(candidate =>
+            '<tr><td><strong>' + escapeHtml(candidate.student_name) + '</strong></td><td class="mono">' + escapeHtml(candidate.terminal_id) + '</td><td><span class="session-status ' + (candidate.active ? 'active' : '') + '">' + (candidate.active ? 'Active' : 'Inactive') + '</span></td><td>' + (candidate.active ? '<button class="table-action" data-roster-id="' + Number(candidate.id) + '" type="button">Deactivate</button>' : '—') + '</td></tr>'
+        ).join('') : '<tr><td colspan="4" class="empty-state">No roster entries. Candidate login remains open to any valid PIN/name/seat until a roster is created.</td></tr>';
+    } catch (error) {
+        body.innerHTML = '<tr><td colspan="4" class="empty-state">' + escapeHtml(error.message) + '</td></tr>';
+    }
+}
+
+async function addRosterCandidate(event) {
+    event.preventDefault();
+    const feedback = document.getElementById('rosterFeedback');
+    const name = document.getElementById('rosterNameInput').value.trim();
+    const terminal = document.getElementById('rosterTerminalInput').value.trim();
+    try {
+        await facultyApi('/faculty/candidates', {
+            method: 'POST',
+            body: JSON.stringify({ student_name: name, terminal_id: terminal })
+        });
+        document.getElementById('candidateForm').reset();
+        if (feedback) feedback.textContent = 'Candidate registered and seat allocated.';
+        await loadCandidateRoster();
+    } catch (error) {
+        if (feedback) feedback.textContent = error.message;
+    }
+}
+
+async function handleRosterAction(event) {
+    const button = event.target.closest('[data-roster-id]');
+    if (!button) return;
+    if (!window.confirm('Deactivate this candidate roster entry? They will no longer be able to sign in.')) return;
+    try {
+        await facultyApi('/faculty/candidates/' + Number(button.dataset.rosterId), { method: 'DELETE' });
+        await loadCandidateRoster();
+    } catch (error) {
+        const feedback = document.getElementById('rosterFeedback');
+        if (feedback) feedback.textContent = error.message;
+    }
+}
+
+async function loadFacultySessions() {
+    const body = document.getElementById('sessionTableBody');
+    if (!body) return;
+    try {
+        const data = await facultyApi('/faculty/sessions');
+        const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+        body.innerHTML = sessions.length ? sessions.map(session => {
+            const status = String(session.status || 'UNKNOWN');
+            const canFinalize = status === 'ACTIVE' || status === 'ENDED';
+            return '<tr><td><strong>' + escapeHtml(session.student_name) + '</strong></td><td class="mono">' + escapeHtml(session.terminal_id) + '</td><td>' + escapeHtml(session.started_at || '—') + '</td><td>' + escapeHtml(session.last_seen_at || '—') + '</td><td><span class="session-status ' + (status === 'ACTIVE' ? 'active' : status === 'CANCELLED' ? 'cancelled' : '') + '">' + escapeHtml(status) + '</span></td><td>' + (canFinalize ? '<button class="table-action" data-session-id="' + escapeHtml(session.id) + '" data-final-status="COMPLETED" type="button">Complete</button> <button class="table-action" data-session-id="' + escapeHtml(session.id) + '" data-final-status="CANCELLED" type="button">Cancel</button>' : escapeHtml(session.completion_reason || 'Finalized')) + '</td></tr>';
+        }).join('') : '<tr><td colspan="6" class="empty-state">No examination attempts have been recorded.</td></tr>';
+    } catch (error) {
+        body.innerHTML = '<tr><td colspan="6" class="empty-state">' + escapeHtml(error.message) + '</td></tr>';
+    }
+}
+
+async function handleSessionAction(event) {
+    const button = event.target.closest('[data-session-id]');
+    if (!button) return;
+    const status = button.dataset.finalStatus;
+    if (!window.confirm('Mark this attempt as ' + status.toLowerCase() + '? This will end an active proctoring connection.')) return;
+    try {
+        await facultyApi('/faculty/sessions/' + encodeURIComponent(button.dataset.sessionId) + '/status', {
+            method: 'POST',
+            body: JSON.stringify({ status, reason: 'Finalized by faculty console' })
+        });
+        await loadFacultySessions();
+        await fetchAuditLogs();
+    } catch (error) {
+        window.alert(error.message);
     }
 }
 
