@@ -54,6 +54,7 @@ class ViolationRequest(BaseModel):
     student_name: str = Field(min_length=1, max_length=120)
     violation_type: str = Field(min_length=1, max_length=160)
     terminal_id: str = Field(default="UNKNOWN", max_length=80)
+    session_id: str = Field(min_length=1, max_length=64)
 
     @field_validator("student_name", "violation_type", "terminal_id")
     @classmethod
@@ -319,6 +320,14 @@ async def faculty_unlock(payload: FacultyAuthRequest, request: Request, response
 
 @app.post("/log-violation")
 async def log_violation_endpoint(payload: ViolationRequest):
+    def session_is_active():
+        with db_connection() as conn:
+            return conn.execute(
+                "SELECT 1 FROM sessions WHERE id=? AND student_name=? AND terminal_id=? AND status='ACTIVE'",
+                (payload.session_id, payload.student_name, payload.terminal_id),
+            ).fetchone() is not None
+    if not await asyncio.to_thread(session_is_active):
+        raise HTTPException(status_code=403, detail="An active candidate session is required to report an incident.")
     if should_log_violation(payload.student_name, payload.terminal_id, payload.violation_type):
         await asyncio.to_thread(log_violation_to_db, payload.student_name, payload.violation_type, payload.terminal_id)
     return {"status": "OK"}
