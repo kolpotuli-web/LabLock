@@ -1187,3 +1187,6 @@ body {background:#f1f5f9;color:#101a30;font-family:var(--font-ui);}
 
 .export-link {display:inline-flex;align-items:center;text-decoration:none;}
 .export-link:hover {text-decoration:none;background:#fff5f5;}
+
+.setup-form textarea {width:100%;min-height:150px;resize:vertical;border:1px solid #d5dfeb;border-radius:4px;padding:10px 11px;color:#20344f;font:13px/1.6 var(--font-ui);}
+.problem-desc.configured-problem {white-space:pre-wrap;line-height:1.75;}
