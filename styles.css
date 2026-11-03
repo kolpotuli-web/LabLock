@@ -1184,3 +1184,6 @@ body {background:#f1f5f9;color:#101a30;font-family:var(--font-ui);}
 .session-status {display:inline-block;padding:4px 8px;border-radius:12px;background:#eff4fa;color:#45617e;font-size:10px;font-weight:800;text-transform:uppercase;}
 .session-status.active {background:#e8f8f0;color:#14764c;}.session-status.cancelled {background:#fff0f0;color:#b91c1c;}
 @media(max-width:700px){.setup-form-row,.candidate-form{grid-template-columns:1fr;}.candidate-form .btn{width:100%;}}
+
+.export-link {display:inline-flex;align-items:center;text-decoration:none;}
+.export-link:hover {text-decoration:none;background:#fff5f5;}
