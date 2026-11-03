@@ -353,6 +353,13 @@ function connectProctorWebSocket(video, canvas, statusIndicator, statusText) {
                 if (response.status === 'VIOLATION') {
                     const messages = Array.isArray(response.messages) ? response.messages : [response.message || 'Policy Non-Compliance Detected'];
                     messages.forEach(handleViolationAlert);
+                } else if (response.status === 'SESSION_ENDED') {
+                    const banner = document.getElementById('securityBanner');
+                    const bannerText = document.getElementById('securityBannerText');
+                    if (bannerText) bannerText.textContent = response.message || 'This examination attempt has ended.';
+                    if (banner) banner.classList.add('active');
+                    state.authenticated = false;
+                    endCandidateSession();
                 }
             } catch (parseErr) {
                 console.error('Invalid WebSocket payload received:', event.data);
@@ -364,9 +371,16 @@ function connectProctorWebSocket(video, canvas, statusIndicator, statusText) {
             if (statusText) statusText.textContent = 'Connection Error';
         };
 
-        state.ws.onclose = () => {
+        state.ws.onclose = (event) => {
             if (statusIndicator) statusIndicator.className = 'pulse-indicator alert';
             if (statusText) statusText.textContent = 'Disconnected';
+            if (event && event.code === 1008) {
+                state.authenticated = false;
+                const banner = document.getElementById('securityBanner');
+                const bannerText = document.getElementById('securityBannerText');
+                if (bannerText) bannerText.textContent = 'The examination session was closed or expired. Contact the invigilator.';
+                if (banner) banner.classList.add('active');
+            }
             if (state.sampleTimer) {
                 clearInterval(state.sampleTimer);
                 state.sampleTimer = null;
