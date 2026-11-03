@@ -77,9 +77,23 @@ def _connect_db() -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     return conn
 
+@asynccontextmanager
+async def _unused_async_context():
+    yield
+
+from contextlib import contextmanager
+
+@contextmanager
+def db_connection():
+    conn = _connect_db()
+    try:
+        yield conn
+    finally:
+        conn.close()
+
 
 def setup_database() -> None:
-    with _connect_db() as conn:
+    with db_connection() as conn:
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS violations (
@@ -277,7 +291,7 @@ async def authenticate(payload: AuthRequest):
     student_name = payload.student_name.strip()
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
-    with _connect_db() as conn:
+    with db_connection() as conn:
         active = conn.execute(
             "SELECT id FROM sessions WHERE terminal_id=? AND status='ACTIVE' ORDER BY started_at DESC LIMIT 1",
             (terminal_id,),
@@ -310,7 +324,7 @@ async def log_violation_endpoint(payload: ViolationRequest):
 async def get_logs_endpoint():
     try:
         def read_logs():
-            with _connect_db() as conn:
+            with db_connection() as conn:
                 rows = conn.execute("SELECT * FROM violations ORDER BY timestamp DESC LIMIT 500").fetchall()
                 active = conn.execute(
                     "SELECT COUNT(*) AS n FROM sessions WHERE status='ACTIVE' AND last_seen_at >= datetime('now','-45 seconds')"
@@ -328,7 +342,7 @@ async def session_heartbeat(payload: dict):
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id is required")
     def update():
-        with _connect_db() as conn:
+        with db_connection() as conn:
             cursor = conn.execute(
                 "UPDATE sessions SET last_seen_at=CURRENT_TIMESTAMP WHERE id=? AND status='ACTIVE'",
                 (session_id,),
@@ -347,7 +361,7 @@ async def session_end(payload: dict):
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id is required")
     def finish():
-        with _connect_db() as conn:
+        with db_connection() as conn:
             cursor = conn.execute(
                 "UPDATE sessions SET status='ENDED', ended_at=CURRENT_TIMESTAMP WHERE id=? AND status='ACTIVE'",
                 (session_id,),
@@ -366,7 +380,7 @@ async def proctor_endpoint(websocket: WebSocket, student_name: str):
     terminal_id = websocket.query_params.get("terminal_id", "UNKNOWN")[:80]
     session_id = websocket.query_params.get("session_id", "")
     def valid_session():
-        with _connect_db() as conn:
+        with db_connection() as conn:
             return conn.execute(
                 "SELECT id FROM sessions WHERE id=? AND student_name=? AND terminal_id=? AND status='ACTIVE'",
                 (session_id, student_name[:120], terminal_id),
