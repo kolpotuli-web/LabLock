@@ -176,6 +176,7 @@ function initStudentTerminal() {
                 if (!response.ok) throw new Error(result.detail || 'Candidate authentication failed.');
                 state.sessionId = result.session_id;
                 state.examTitle = result.exam_title || 'LabLock Examination';
+                state.examProblemStatement = result.problem_statement || '';
                 state.examDurationMinutes = Number(result.duration_minutes) || 60;
             } catch (authErr) {
                 showAuthError(authErr.message || 'Unable to authenticate with the examination server.');
@@ -199,6 +200,11 @@ function initStudentTerminal() {
             const examDurationDisplay = document.getElementById('examDurationDisplay');
             if (examTitleDisplay) examTitleDisplay.textContent = state.examTitle;
             if (examDurationDisplay) examDurationDisplay.textContent = 'Attempt duration: ' + state.examDurationMinutes + ' minutes';
+            const problemDescription = document.querySelector('.problem-desc');
+            if (problemDescription && state.examProblemStatement.trim()) {
+                problemDescription.textContent = state.examProblemStatement;
+                problemDescription.classList.add('configured-problem');
+            }
             startAttemptCountdown();
 
             const cameraReady = await startWebcamProctoring();
@@ -905,11 +911,13 @@ async function loadExamConfiguration() {
     try {
         const config = await facultyApi('/faculty/exam');
         const title = document.getElementById('examTitleInput');
+        const problem = document.getElementById('examProblemInput');
         const duration = document.getElementById('examDurationInput');
         const status = document.getElementById('examStatusInput');
         const start = document.getElementById('examStartInput');
         const end = document.getElementById('examEndInput');
         if (title) title.value = config.title || '';
+        if (problem) problem.value = config.problem_statement || '';
         if (duration) duration.value = config.duration_minutes || 60;
         if (status) status.value = config.status || 'OPEN';
         if (start) start.value = config.starts_at ? String(config.starts_at).slice(0, 16) : '';
@@ -925,6 +933,7 @@ async function saveExamConfiguration(event) {
     const feedback = document.getElementById('examConfigFeedback');
     const payload = {
         title: document.getElementById('examTitleInput').value.trim(),
+        problem_statement: document.getElementById('examProblemInput').value.trim(),
         duration_minutes: Number(document.getElementById('examDurationInput').value),
         status: document.getElementById('examStatusInput').value,
         starts_at: document.getElementById('examStartInput').value || null,
