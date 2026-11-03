@@ -518,6 +518,18 @@ async def faculty_get_exam(request: Request):
 @app.put("/faculty/exam")
 async def faculty_set_exam(payload: ExamConfiguration, request: Request):
     require_faculty(request)
+    try:
+        scheduled_start = datetime.fromisoformat(payload.starts_at) if payload.starts_at else None
+        scheduled_end = datetime.fromisoformat(payload.ends_at) if payload.ends_at else None
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="Schedule values must be valid ISO date/time values.") from exc
+    if scheduled_start and scheduled_end:
+        if scheduled_start.tzinfo is None:
+            scheduled_start = scheduled_start.astimezone()
+        if scheduled_end.tzinfo is None:
+            scheduled_end = scheduled_end.astimezone()
+        if scheduled_end <= scheduled_start:
+            raise HTTPException(status_code=422, detail="Scheduled end must be later than scheduled start.")
     with db_connection() as conn:
         conn.execute("""
             INSERT INTO exam_config (id, title, problem_statement, duration_minutes, status, starts_at, ends_at, updated_at)
