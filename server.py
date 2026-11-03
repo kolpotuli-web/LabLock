@@ -672,10 +672,17 @@ async def faculty_export_incidents(request: Request):
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(["Incident ID", "Timestamp", "Candidate", "Terminal", "Violation"])
+        def safe_cell(value: Any) -> str:
+            text = "" if value is None else str(value)
+            if text.startswith(("=", "+", "-", "@", "\t", "\r")):
+                return "'" + text
+            return text
         with db_connection() as conn:
             rows = conn.execute("SELECT id, timestamp, student_name, terminal_id, violation_type FROM violations ORDER BY timestamp DESC").fetchall()
             for row in rows:
-                writer.writerow([row["id"], row["timestamp"], row["student_name"], row["terminal_id"], row["violation_type"]])
+                writer.writerow([safe_cell(row["id"]), safe_cell(row["timestamp"]),
+                                  safe_cell(row["student_name"]), safe_cell(row["terminal_id"]),
+                                  safe_cell(row["violation_type"])])
         return output.getvalue()
     content = await asyncio.to_thread(build_csv)
     return Response(
