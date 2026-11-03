@@ -369,7 +369,7 @@ async def health():
 
 @app.post("/authenticate")
 async def authenticate(payload: AuthRequest, request: Request):
-    rate_key = "candidate:" + (request.client.host if request.client else "unknown")
+    rate_key = "candidate:" + (request.client.host if request.client else "unknown") + ":" + payload.terminal_id.strip().upper()
     enforce_auth_rate_limit(rate_key)
     if not authenticate_candidate(payload):
         record_auth_failure(rate_key)
