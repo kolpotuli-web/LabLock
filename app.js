@@ -220,7 +220,7 @@ function initStudentTerminal() {
 
             try {
                 const response = await fetch(CONFIG.API_BASE + '/faculty/unlock', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ pin: pinVal })
                 });
                 const result = await response.json();
