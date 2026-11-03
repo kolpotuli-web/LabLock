@@ -374,7 +374,7 @@ async def authenticate(payload: AuthRequest, request: Request):
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
     with db_connection() as conn:
-        config = conn.execute("SELECT status, starts_at, ends_at FROM exam_config WHERE id=1").fetchone()
+        config = conn.execute("SELECT status, starts_at, ends_at, title, duration_minutes FROM exam_config WHERE id=1").fetchone()
         if config:
             if config["status"] != "OPEN":
                 raise HTTPException(status_code=403, detail="The examination is not currently accepting candidates.")
@@ -408,14 +408,18 @@ async def authenticate(payload: AuthRequest, request: Request):
         ).fetchone()
         if active:
             raise HTTPException(status_code=409, detail="This terminal already has an active examination session.")
-        config_duration = conn.execute("SELECT duration_minutes FROM exam_config WHERE id=1").fetchone()
-        duration_minutes = int(config_duration["duration_minutes"]) if config_duration else 0
+        duration_minutes = int(config["duration_minutes"]) if config else 60
+        exam_title = config["title"] if config else "LabLock Examination"
         conn.execute(
             "INSERT INTO sessions (id, student_name, terminal_id, duration_minutes) VALUES (?, ?, ?, ?)",
             (session_id, student_name, terminal_id, duration_minutes),
         )
         conn.commit()
-    return {"status": "OK", "session_id": session_id, "student_name": student_name, "terminal_id": terminal_id}
+    return {
+        "status": "OK", "session_id": session_id, "student_name": student_name,
+        "terminal_id": terminal_id, "exam_title": exam_title,
+        "duration_minutes": duration_minutes,
+    }
 
 
 @app.post("/faculty/unlock")
