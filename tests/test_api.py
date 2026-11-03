@@ -71,6 +71,8 @@ def test_candidate_faculty_audit_and_session_lifecycle(tmp_path, monkeypatch):
         ended = client.post("/session/end", json={"session_id": session_id})
         assert ended.status_code == 200
         assert client.post("/session/heartbeat", json={"session_id": session_id}).status_code == 404
+        assert client.post("/faculty/logout").status_code == 200
+        assert client.get("/get-logs").status_code == 401
 
 
 def test_faculty_exam_roster_and_attempt_management(tmp_path, monkeypatch):
