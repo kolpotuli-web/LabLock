@@ -58,6 +58,7 @@ _model_load_error: str | None = None
 _auth_attempt_lock = threading.Lock()
 _auth_failures: dict[str, list[float]] = {}
 AUTH_FAILURE_LIMIT = 8
+CANDIDATE_IP_FAILURE_LIMIT = 40
 AUTH_WINDOW_SECONDS = 300
 
 
@@ -317,12 +318,12 @@ def log_violation_to_db(student_name: str, violation_type: str, terminal_id: str
         conn.commit()
 
 
-def enforce_auth_rate_limit(key: str) -> None:
+def enforce_auth_rate_limit(key: str, limit: int = AUTH_FAILURE_LIMIT) -> None:
     now = time.monotonic()
     with _auth_attempt_lock:
         attempts = [stamp for stamp in _auth_failures.get(key, []) if now - stamp < AUTH_WINDOW_SECONDS]
         _auth_failures[key] = attempts
-        if len(attempts) >= AUTH_FAILURE_LIMIT:
+        if len(attempts) >= limit:
             raise HTTPException(status_code=429, detail="Too many failed sign-in attempts. Try again in five minutes.")
 
 
@@ -391,12 +392,17 @@ async def health():
 
 @app.post("/authenticate")
 async def authenticate(payload: AuthRequest, request: Request):
-    rate_key = "candidate:" + (request.client.host if request.client else "unknown") + ":" + payload.terminal_id.strip().upper()
-    enforce_auth_rate_limit(rate_key)
+    client_ip = request.client.host if request.client else "unknown"
+    terminal_rate_key = "candidate-terminal:" + client_ip + ":" + payload.terminal_id.strip().upper()
+    ip_rate_key = "candidate-ip:" + client_ip
+    enforce_auth_rate_limit(terminal_rate_key)
+    enforce_auth_rate_limit(ip_rate_key, CANDIDATE_IP_FAILURE_LIMIT)
     if not authenticate_candidate(payload):
-        record_auth_failure(rate_key)
+        record_auth_failure(terminal_rate_key)
+        record_auth_failure(ip_rate_key)
         raise HTTPException(status_code=401, detail="Invalid examination credentials.")
-    clear_auth_failures(rate_key)
+    clear_auth_failures(terminal_rate_key)
+    clear_auth_failures(ip_rate_key)
     student_name = payload.student_name.strip()
     terminal_id = payload.terminal_id.strip().upper()
     session_id = uuid.uuid4().hex
